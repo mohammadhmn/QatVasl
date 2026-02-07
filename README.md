@@ -65,13 +65,23 @@ just dev
 ## Common Commands
 
 ```bash
-just doctor         # Check Xcode setup and project schemes
-just dev            # Build/run Debug
-just build-debug    # Debug build
-just build-release  # Release build
-just dmg            # Build dmg in build/dist/
-just logs           # Stream app logs
-just reset-settings # Reset app defaults
+just list                # Show all recipes
+just doctor              # Check Xcode setup and project schemes
+just dev                 # Build/run Debug
+just run-release         # Build/run Release
+just build-debug         # Debug build
+just build-release       # Release build
+just dist                # Build .app in build/dist/
+just dmg                 # Build dmg in build/dist/
+just release patch       # Auto bump patch and release
+just release minor       # Auto bump minor and release
+just release v1.2.3      # Release an explicit version
+just kickoff-release     # Alias: bump patch and release
+scripts/release.sh --version v1.2.3
+scripts/release.sh --bump patch
+just ci                  # Quick local CI: doctor + debug build
+just logs                # Stream app logs
+just reset-settings      # Reset app defaults
 ```
 
 ## Project Structure

@@ -10,8 +10,12 @@ archive_path := "build/QatVasl.xcarchive"
 debug_app := "build/DerivedData/Build/Products/Debug/QatVasl.app"
 release_app := "build/DerivedData/Build/Products/Release/QatVasl.app"
 dmg_path := "build/dist/QatVasl.dmg"
+xcodebuild_base := "xcodebuild -project \"{{project}}\" -scheme \"{{scheme}}\" -destination 'platform=macOS' -derivedDataPath \"{{derived_data}}\""
 
 default:
+    @just --list
+
+list:
     @just --list
 
 doctor:
@@ -19,7 +23,7 @@ doctor:
     xcodebuild -list -project "{{project}}"
 
 build configuration="Debug":
-    xcodebuild -project "{{project}}" -scheme "{{scheme}}" -configuration "{{configuration}}" -destination 'platform=macOS' -derivedDataPath "{{derived_data}}" CODE_SIGNING_ALLOWED=NO build
+    {{xcodebuild_base}} -configuration "{{configuration}}" CODE_SIGNING_ALLOWED=NO build
 
 build-debug:
     just build Debug
@@ -36,12 +40,18 @@ run configuration="Debug":
 dev:
     just run Debug
 
+run-release:
+    just run Release
+
 clean:
-    xcodebuild -project "{{project}}" -scheme "{{scheme}}" -configuration Debug -derivedDataPath "{{derived_data}}" clean || true
+    {{xcodebuild_base}} -configuration Debug clean || true
     rm -rf "{{build_root}}"
 
 archive:
     xcodebuild -project "{{project}}" -scheme "{{scheme}}" -configuration Release -destination 'generic/platform=macOS' -archivePath "{{archive_path}}" -derivedDataPath "{{derived_data}}" CODE_SIGNING_ALLOWED=NO archive
+
+dist:
+    just package-app
 
 package-app:
     just build Release
@@ -73,3 +83,16 @@ logs:
 
 reset-settings:
     defaults delete com.mhmoaz.QatVasl || true
+
+tag-release version:
+    scripts/release.sh --version "{{version}}"
+
+release version:
+    scripts/release.sh "{{version}}"
+
+ci:
+    just doctor
+    just build-debug
+
+kickoff-release version="patch":
+    scripts/release.sh --bump "{{version}}"
