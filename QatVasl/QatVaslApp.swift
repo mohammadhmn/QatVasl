@@ -53,13 +53,16 @@ struct QatVaslApp: App {
     @NSApplicationDelegateAdaptor(QatVaslAppDelegate.self) private var appDelegate
     @StateObject private var settingsStore: SettingsStore
     @StateObject private var monitor: NetworkMonitor
+    @StateObject private var iranPulseMonitor: IranPulseMonitor
     @StateObject private var navigationStore = DashboardNavigationStore()
 
     init() {
         let sharedRouteInspector = RouteInspector()
         let store = SettingsStore(routeInspector: sharedRouteInspector)
+        let iranPulse = IranPulseMonitor(settingsStore: store)
         _settingsStore = StateObject(wrappedValue: store)
         _monitor = StateObject(wrappedValue: NetworkMonitor(settingsStore: store, routeInspector: sharedRouteInspector))
+        _iranPulseMonitor = StateObject(wrappedValue: iranPulse)
     }
 
     var body: some Scene {
@@ -67,6 +70,7 @@ struct QatVaslApp: App {
             ContentView()
                 .environmentObject(settingsStore)
                 .environmentObject(monitor)
+                .environmentObject(iranPulseMonitor)
                 .environmentObject(navigationStore)
                 .preferredColorScheme(.dark)
         }
@@ -77,6 +81,7 @@ struct QatVaslApp: App {
             MenuBarContentView()
                 .environmentObject(settingsStore)
                 .environmentObject(monitor)
+                .environmentObject(iranPulseMonitor)
                 .environmentObject(navigationStore)
                 .preferredColorScheme(.dark)
         }
@@ -85,11 +90,16 @@ struct QatVaslApp: App {
                 Circle()
                     .fill(monitor.displayState.accentColor)
                     .frame(width: 8, height: 8)
+                if settingsStore.settings.iranPulseEnabled {
+                    Circle()
+                        .fill(iranPulseMonitor.snapshot.severity.accentColor)
+                        .frame(width: 6, height: 6)
+                }
                 Text(monitor.displayState.compactMenuLabel)
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
             }
-            .accessibilityLabel(monitor.displayState.menuTitle)
+            .accessibilityLabel("\(monitor.displayState.menuTitle). Iran pulse \(iranPulseMonitor.snapshot.compactLabel)")
         }
         .menuBarExtraStyle(.window)
     }

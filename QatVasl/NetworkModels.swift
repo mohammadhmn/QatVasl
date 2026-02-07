@@ -404,6 +404,10 @@ struct MonitorSettings: Codable, Equatable {
     var quietHoursEnd: Int
     var launchAtLogin: Bool
     var autoDetectISPOnLaunch: Bool
+    var iranPulseEnabled: Bool
+    var iranPulseIntervalMinutes: Double
+    var iranPulseVanillappEnabled: Bool
+    var iranPulseOoniEnabled: Bool
 
     enum CodingKeys: String, CodingKey {
         case intervalSeconds
@@ -429,6 +433,10 @@ struct MonitorSettings: Codable, Equatable {
         case quietHoursEnd
         case launchAtLogin
         case autoDetectISPOnLaunch
+        case iranPulseEnabled
+        case iranPulseIntervalMinutes
+        case iranPulseVanillappEnabled
+        case iranPulseOoniEnabled
     }
 
     static var defaults: MonitorSettings {
@@ -455,7 +463,11 @@ struct MonitorSettings: Codable, Equatable {
             quietHoursStart: 0,
             quietHoursEnd: 7,
             launchAtLogin: false,
-            autoDetectISPOnLaunch: true
+            autoDetectISPOnLaunch: true,
+            iranPulseEnabled: true,
+            iranPulseIntervalMinutes: 5,
+            iranPulseVanillappEnabled: true,
+            iranPulseOoniEnabled: true
         )
     }
 
@@ -482,7 +494,11 @@ struct MonitorSettings: Codable, Equatable {
         quietHoursStart: Int,
         quietHoursEnd: Int,
         launchAtLogin: Bool,
-        autoDetectISPOnLaunch: Bool
+        autoDetectISPOnLaunch: Bool,
+        iranPulseEnabled: Bool,
+        iranPulseIntervalMinutes: Double,
+        iranPulseVanillappEnabled: Bool,
+        iranPulseOoniEnabled: Bool
     ) {
         self.intervalSeconds = intervalSeconds
         self.timeoutSeconds = timeoutSeconds
@@ -507,6 +523,10 @@ struct MonitorSettings: Codable, Equatable {
         self.quietHoursEnd = quietHoursEnd
         self.launchAtLogin = launchAtLogin
         self.autoDetectISPOnLaunch = autoDetectISPOnLaunch
+        self.iranPulseEnabled = iranPulseEnabled
+        self.iranPulseIntervalMinutes = iranPulseIntervalMinutes
+        self.iranPulseVanillappEnabled = iranPulseVanillappEnabled
+        self.iranPulseOoniEnabled = iranPulseOoniEnabled
         sanitizeProfiles()
         sanitizeCriticalServices()
     }
@@ -538,6 +558,10 @@ struct MonitorSettings: Codable, Equatable {
         quietHoursEnd = try container.decodeIfPresent(Int.self, forKey: .quietHoursEnd) ?? defaults.quietHoursEnd
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? defaults.launchAtLogin
         autoDetectISPOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .autoDetectISPOnLaunch) ?? defaults.autoDetectISPOnLaunch
+        iranPulseEnabled = try container.decodeIfPresent(Bool.self, forKey: .iranPulseEnabled) ?? defaults.iranPulseEnabled
+        iranPulseIntervalMinutes = try container.decodeIfPresent(Double.self, forKey: .iranPulseIntervalMinutes) ?? defaults.iranPulseIntervalMinutes
+        iranPulseVanillappEnabled = try container.decodeIfPresent(Bool.self, forKey: .iranPulseVanillappEnabled) ?? defaults.iranPulseVanillappEnabled
+        iranPulseOoniEnabled = try container.decodeIfPresent(Bool.self, forKey: .iranPulseOoniEnabled) ?? defaults.iranPulseOoniEnabled
 
         sanitizeProfiles()
         sanitizeCriticalServices()
@@ -561,6 +585,10 @@ struct MonitorSettings: Codable, Equatable {
 
     var normalizedQuietHoursEnd: Int {
         max(0, min(quietHoursEnd, 23))
+    }
+
+    var normalizedIranPulseInterval: TimeInterval {
+        max(120, min(iranPulseIntervalMinutes * 60, 3600))
     }
 
     var domesticProbeTargets: [String] {
@@ -913,4 +941,116 @@ struct MonitorPerformanceSummary: Equatable {
         criticalServicesRefreshCount: 0,
         persistenceFlushCount: 0
     )
+}
+
+enum IranPulseSource: String, Codable, CaseIterable, Identifiable {
+    case vanillapp
+    case ooni
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .vanillapp:
+            return "Vanillapp Radar"
+        case .ooni:
+            return "OONI"
+        }
+    }
+}
+
+enum IranPulseSeverity: String, Codable, Equatable {
+    case normal
+    case degraded
+    case severe
+    case unknown
+
+    var title: String {
+        switch self {
+        case .normal:
+            return "Normal"
+        case .degraded:
+            return "Degraded"
+        case .severe:
+            return "Severe"
+        case .unknown:
+            return "Unknown"
+        }
+    }
+
+    var compactLabel: String {
+        switch self {
+        case .normal:
+            return "OK"
+        case .degraded:
+            return "DEG"
+        case .severe:
+            return "SEV"
+        case .unknown:
+            return "UNK"
+        }
+    }
+}
+
+struct IranPulseProviderSnapshot: Codable, Equatable, Identifiable {
+    let source: IranPulseSource
+    let score: Int?
+    let severity: IranPulseSeverity
+    let confidence: Double
+    let capturedAt: Date?
+    let stale: Bool
+    let summary: String
+    let details: [String: String]
+    let error: String?
+
+    var id: String { source.rawValue }
+}
+
+struct IranPulseSnapshot: Codable, Equatable {
+    let score: Int?
+    let severity: IranPulseSeverity
+    let confidence: Double
+    let summary: String
+    let providers: [IranPulseProviderSnapshot]
+    let lastUpdated: Date
+
+    var compactLabel: String {
+        if let score {
+            return "\(severity.compactLabel) \(score)"
+        }
+        return severity.compactLabel
+    }
+
+    static func initial(now: Date = Date()) -> IranPulseSnapshot {
+        IranPulseSnapshot(
+            score: nil,
+            severity: .unknown,
+            confidence: 0,
+            summary: "Waiting for first national pulse check.",
+            providers: [],
+            lastUpdated: now
+        )
+    }
+
+    static func disabled(now: Date = Date()) -> IranPulseSnapshot {
+        IranPulseSnapshot(
+            score: nil,
+            severity: .unknown,
+            confidence: 0,
+            summary: "National pulse monitoring is disabled.",
+            providers: [],
+            lastUpdated: now
+        )
+    }
+
+    static func noProviders(now: Date = Date()) -> IranPulseSnapshot {
+        IranPulseSnapshot(
+            score: nil,
+            severity: .unknown,
+            confidence: 0,
+            summary: "No Iran pulse providers are enabled.",
+            providers: [],
+            lastUpdated: now
+        )
+    }
 }
