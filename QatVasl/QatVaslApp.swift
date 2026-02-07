@@ -79,7 +79,7 @@ struct QatVaslApp: App {
         label: {
             HStack(spacing: 5) {
                 Circle()
-                    .fill(menuStateColor(for: monitor.currentState))
+                    .fill(monitor.currentState.accentColor)
                     .frame(width: 8, height: 8)
                 Text(monitor.currentState.compactMenuLabel)
                     .font(.caption.weight(.semibold))
@@ -94,23 +94,6 @@ struct QatVaslApp: App {
                 .environmentObject(settingsStore)
                 .environmentObject(monitor)
                 .preferredColorScheme(.dark)
-        }
-    }
-
-    private func menuStateColor(for state: ConnectivityState) -> Color {
-        switch state {
-        case .offline:
-            return .red
-        case .domesticOnly:
-            return .orange
-        case .globalLimited:
-            return .yellow
-        case .vpnOK:
-            return .green
-        case .vpnOrProxyActive:
-            return .blue
-        case .openInternet:
-            return .mint
         }
     }
 }

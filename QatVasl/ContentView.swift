@@ -93,7 +93,7 @@ struct ContentView: View {
             .padding(.top, 12)
             .padding(.bottom, 10)
             .safeAreaInset(edge: .bottom) {
-                GlassCard(cornerRadius: 14, tint: color(for: monitor.currentState).opacity(0.45)) {
+                GlassCard(cornerRadius: 14, tint: monitor.currentState.accentColor.opacity(0.45)) {
                     HStack {
                         StatusPill(state: monitor.currentState)
 
@@ -213,7 +213,7 @@ struct ContentView: View {
     }
 
     private var statusHero: some View {
-        GlassCard(cornerRadius: 24, tint: color(for: monitor.currentState).opacity(0.45)) {
+        GlassCard(cornerRadius: 24, tint: monitor.currentState.accentColor.opacity(0.45)) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     HStack(spacing: 12) {
@@ -243,7 +243,7 @@ struct ContentView: View {
 
                 if !monitor.isDirectPathClean {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Direct path check paused while VPN/PROXY is active.", systemImage: "info.circle")
+                        Label("Direct path check paused while VPN is active.", systemImage: "info.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -396,7 +396,7 @@ struct ContentView: View {
                     ForEach(monitor.transitionHistory.prefix(6)) { entry in
                         HStack {
                             Circle()
-                                .fill(color(for: entry.to))
+                                .fill(entry.to.accentColor)
                                 .frame(width: 8, height: 8)
 
                             Text(entry.label)
@@ -410,23 +410,6 @@ struct ContentView: View {
                     }
                 }
             }
-        }
-    }
-
-    private func color(for state: ConnectivityState) -> Color {
-        switch state {
-        case .offline:
-            return .red
-        case .domesticOnly:
-            return .orange
-        case .globalLimited:
-            return .yellow
-        case .vpnOK:
-            return .green
-        case .vpnOrProxyActive:
-            return .blue
-        case .openInternet:
-            return .mint
         }
     }
 
