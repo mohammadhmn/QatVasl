@@ -102,7 +102,7 @@ struct ContentView: View {
             .padding(.bottom, 10)
             .safeAreaInset(edge: .bottom) {
                 GlassCard(cornerRadius: 14, tint: monitor.displayState.accentColor.opacity(0.45)) {
-                    HStack {
+                    HStack(spacing: 10) {
                         StatusPill(state: monitor.displayState)
 
                         Spacer()
@@ -110,15 +110,19 @@ struct ContentView: View {
                         Button {
                             monitor.refreshNow()
                         } label: {
-                            Image(systemName: "arrow.clockwise")
+                            ZStack {
+                                if monitor.isChecking {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.callout.weight(.semibold))
+                                }
+                            }
+                            .frame(width: 18, height: 18)
                         }
                         .buttonStyle(.glass)
                         .disabled(monitor.isChecking)
-
-                        if monitor.isChecking {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
                     }
                 }
                 .padding(.horizontal, 12)

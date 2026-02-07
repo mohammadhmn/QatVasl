@@ -32,15 +32,21 @@ struct StatusPill: View {
     let state: ConnectivityState
 
     var body: some View {
-        Label("\(state.statusEmoji) \(state.shortLabel)", systemImage: state.systemImage)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .glassEffect(.regular.tint(color.opacity(0.14)), in: Capsule(style: .continuous))
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(.white.opacity(0.08), lineWidth: 0.8)
-            )
+        HStack(spacing: 7) {
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+
+            Text(state.shortLabel)
+                .font(.caption.weight(.semibold))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .glassEffect(.regular.tint(color.opacity(0.14)), in: Capsule(style: .continuous))
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 0.8)
+        )
     }
 
     private var color: Color {
