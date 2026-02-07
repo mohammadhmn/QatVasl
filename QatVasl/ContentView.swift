@@ -4,6 +4,7 @@ import SwiftUI
 private enum DashboardSidebarItem: String, CaseIterable, Identifiable {
     case overview
     case probes
+    case services
     case timeline
     case settings
 
@@ -15,6 +16,8 @@ private enum DashboardSidebarItem: String, CaseIterable, Identifiable {
             return "Overview"
         case .probes:
             return "Probes"
+        case .services:
+            return "Services"
         case .timeline:
             return "Timeline"
         case .settings:
@@ -28,6 +31,8 @@ private enum DashboardSidebarItem: String, CaseIterable, Identifiable {
             return "square.grid.2x2.fill"
         case .probes:
             return "dot.scope"
+        case .services:
+            return "square.grid.3x2.fill"
         case .timeline:
             return "clock.arrow.circlepath"
         case .settings:
@@ -41,6 +46,8 @@ private enum DashboardSidebarItem: String, CaseIterable, Identifiable {
             return .cyan
         case .probes:
             return .mint
+        case .services:
+            return .cyan
         case .timeline:
             return .indigo
         case .settings:
@@ -129,12 +136,16 @@ struct ContentView: View {
                         case .overview:
                             statusHero
                             diagnosisSection
+                            serviceMatrixSection
                             controlsRow
                             probesSection
                         case .probes:
                             statusHero
                             diagnosisSection
                             probesSection
+                        case .services:
+                            statusHero
+                            serviceMatrixSection
                         case .timeline:
                             statusHero
                             diagnosisSection
@@ -433,6 +444,45 @@ struct ContentView: View {
         }
     }
 
+    private var serviceMatrixSection: some View {
+        GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.34)) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Critical Services")
+                    .font(.headline)
+
+                if monitor.criticalServiceResults.isEmpty {
+                    Text("No service checks yet. Enable services in Settings and wait for the next refresh.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(monitor.criticalServiceResults) { service in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Label(service.name, systemImage: service.overallOk ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundStyle(service.overallOk ? .green : .orange)
+                                    .font(.callout.weight(.semibold))
+
+                                Spacer()
+
+                                Text(service.url)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+
+                            HStack(spacing: 12) {
+                                serviceRouteBadge(title: "DIRECT", result: service.direct)
+                                serviceRouteBadge(title: "PROXY", result: service.proxy)
+                            }
+                        }
+                        .padding(10)
+                        .glassEffect(.regular.tint(.white.opacity(0.03)), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+            }
+        }
+    }
+
     private var transitionsSection: some View {
         GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.40)) {
             VStack(alignment: .leading, spacing: 10) {
@@ -613,5 +663,27 @@ struct ContentView: View {
             return "\(minutes)m"
         }
         return "\(minutes)m \(rem)s"
+    }
+
+    @ViewBuilder
+    private func serviceRouteBadge(title: String, result: ServiceRouteProbeResult?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            if let result {
+                Text(result.summary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(result.ok ? .green : .secondary)
+            } else {
+                Text("—")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .glassEffect(.regular.tint(.white.opacity(0.04)), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

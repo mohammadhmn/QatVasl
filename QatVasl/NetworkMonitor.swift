@@ -8,6 +8,7 @@ final class NetworkMonitor: ObservableObject {
     @Published private(set) var diagnosis: ConnectivityDiagnosis
     @Published private(set) var routeIndicators: [RouteIndicator]
     @Published private(set) var lastSnapshot: ProbeSnapshot?
+    @Published private(set) var criticalServiceResults: [CriticalServiceResult]
     @Published private(set) var lastCheckedAt: Date?
     @Published private(set) var isChecking = false
     @Published private(set) var latestError: String?
@@ -30,6 +31,7 @@ final class NetworkMonitor: ObservableObject {
     private var settingsObserver: AnyCancellable?
     private var notificationsAllowed = false
     private var lastNotificationSentAt: Date?
+    private var lastCriticalServicesCheckAt: Date?
     private var hasCompletedFirstCheck = false
 
     var displayState: ConnectivityState {
@@ -112,6 +114,7 @@ final class NetworkMonitor: ObservableObject {
         self.routeIndicators = ConnectivityAssessment.initial.routeIndicators
         self.transitionHistory = Self.loadHistory(from: defaults, key: historyKey)
         self.healthSamples = Self.loadSamples(from: defaults, key: samplesKey)
+        self.criticalServiceResults = []
 
         settingsObserver = settingsStore.$settings
             .dropFirst()
@@ -184,6 +187,11 @@ final class NetworkMonitor: ObservableObject {
         let settings = settingsStore.settings
         let routeContext = await routeInspector.inspect()
         let snapshot = await probeEngine.runSnapshot(settings: settings)
+        let timestamp = Date()
+        if shouldRefreshCriticalServices(now: timestamp, interval: settings.normalizedInterval) {
+            criticalServiceResults = await probeEngine.runCriticalServices(settings: settings)
+            lastCriticalServicesCheckAt = timestamp
+        }
         let proxyEndpointConnected = await probeEngine.isProxyEndpointConnected(settings: settings)
         let proxyIsWorking = apply(
             routeContext: routeContext,
@@ -399,5 +407,14 @@ final class NetworkMonitor: ObservableObject {
         }
 
         return hour >= start || hour < end
+    }
+
+    private func shouldRefreshCriticalServices(now: Date, interval: TimeInterval) -> Bool {
+        guard let lastCriticalServicesCheckAt else {
+            return true
+        }
+
+        let refreshInterval = max(30, min(300, interval * 2))
+        return now.timeIntervalSince(lastCriticalServicesCheckAt) >= refreshInterval
     }
 }

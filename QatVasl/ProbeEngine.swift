@@ -79,6 +79,66 @@ final class ProbeEngine {
         return await Self.tcpConnect(host: host, port: settings.proxyPort, timeout: timeout)
     }
 
+    func runCriticalServices(settings: MonitorSettings) async -> [CriticalServiceResult] {
+        let services = settings.criticalServices.filter(\.enabled)
+        guard !services.isEmpty else {
+            return []
+        }
+
+        let timeout = min(settings.normalizedTimeout, 10)
+        let proxySession = settings.proxyEnabled ? proxySession(for: settings) : nil
+        var results: [CriticalServiceResult] = []
+        results.reserveCapacity(services.count)
+
+        for service in services {
+            let directResult: ServiceRouteProbeResult?
+            if service.checkDirect {
+                directResult = await probeServiceRoute(
+                    target: service.url,
+                    timeout: timeout,
+                    session: directSession,
+                    route: .direct
+                )
+            } else {
+                directResult = nil
+            }
+
+            let proxyResult: ServiceRouteProbeResult?
+            if service.checkProxy {
+                if let proxySession {
+                    proxyResult = await probeServiceRoute(
+                        target: service.url,
+                        timeout: timeout,
+                        session: proxySession,
+                        route: .proxy
+                    )
+                } else {
+                    proxyResult = ServiceRouteProbeResult(
+                        route: .proxy,
+                        ok: false,
+                        statusCode: nil,
+                        latencyMs: nil,
+                        error: "Proxy disabled"
+                    )
+                }
+            } else {
+                proxyResult = nil
+            }
+
+            results.append(
+                CriticalServiceResult(
+                    id: service.id,
+                    name: service.name,
+                    url: service.url,
+                    direct: directResult,
+                    proxy: proxyResult
+                )
+            )
+        }
+
+        return results
+    }
+
     private func probeDirect(
         kind: ProbeKind,
         target: String,
@@ -177,6 +237,48 @@ final class ProbeEngine {
             return ProbeResult(
                 kind: kind,
                 target: target,
+                ok: false,
+                statusCode: nil,
+                latencyMs: Int(Date().timeIntervalSince(started) * 1000),
+                error: map(error: error)
+            )
+        }
+    }
+
+    private func probeServiceRoute(
+        target: String,
+        timeout: TimeInterval,
+        session: URLSession,
+        route: RouteKind
+    ) async -> ServiceRouteProbeResult {
+        guard let url = URL(string: target) else {
+            return ServiceRouteProbeResult(
+                route: route,
+                ok: false,
+                statusCode: nil,
+                latencyMs: nil,
+                error: "Invalid URL"
+            )
+        }
+
+        let request = makeRequest(url: url, timeout: timeout)
+        let started = Date()
+        do {
+            let (_, response) = try await session.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode
+            let latencyMs = Int(Date().timeIntervalSince(started) * 1000)
+            let ok = statusCode.map { (200..<500).contains($0) } ?? false
+
+            return ServiceRouteProbeResult(
+                route: route,
+                ok: ok,
+                statusCode: statusCode,
+                latencyMs: latencyMs,
+                error: ok ? nil : "Unexpected response"
+            )
+        } catch {
+            return ServiceRouteProbeResult(
+                route: route,
                 ok: false,
                 statusCode: nil,
                 latencyMs: Int(Date().timeIntervalSince(started) * 1000),

@@ -76,6 +76,23 @@ struct MenuBarContentView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                if !monitor.criticalServiceResults.isEmpty {
+                    Divider()
+
+                    Text("Critical services")
+                        .font(.caption.weight(.semibold))
+
+                    ForEach(monitor.criticalServiceResults.prefix(3)) { service in
+                        HStack {
+                            Text(service.name)
+                                .font(.caption2)
+                            Spacer()
+                            Image(systemName: service.overallOk ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundStyle(service.overallOk ? .green : .orange)
+                        }
+                    }
+                }
+
                 HStack {
                     Button("Refresh") { monitor.refreshNow() }
                         .buttonStyle(.glass)

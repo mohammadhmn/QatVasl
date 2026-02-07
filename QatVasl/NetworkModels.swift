@@ -276,6 +276,72 @@ struct ISPProfile: Codable, Equatable, Identifiable {
     }
 }
 
+struct CriticalServiceConfig: Codable, Equatable, Identifiable {
+    let id: String
+    var name: String
+    var url: String
+    var enabled: Bool
+    var checkDirect: Bool
+    var checkProxy: Bool
+
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        url: String,
+        enabled: Bool = true,
+        checkDirect: Bool = true,
+        checkProxy: Bool = true
+    ) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.enabled = enabled
+        self.checkDirect = checkDirect
+        self.checkProxy = checkProxy
+    }
+
+    static var defaults: [CriticalServiceConfig] {
+        [
+            CriticalServiceConfig(name: "Telegram", url: "https://web.telegram.org/"),
+            CriticalServiceConfig(name: "GitHub", url: "https://github.com/"),
+            CriticalServiceConfig(name: "Google", url: "https://www.google.com/"),
+        ]
+    }
+}
+
+struct ServiceRouteProbeResult: Equatable {
+    let route: RouteKind
+    let ok: Bool
+    let statusCode: Int?
+    let latencyMs: Int?
+    let error: String?
+
+    var summary: String {
+        if ok {
+            if let statusCode, let latencyMs {
+                return "✅ \(statusCode) • \(latencyMs) ms"
+            }
+            return "✅ Reachable"
+        }
+        if let error, !error.isEmpty {
+            return "❌ \(error)"
+        }
+        return "❌ Failed"
+    }
+}
+
+struct CriticalServiceResult: Equatable, Identifiable {
+    let id: String
+    let name: String
+    let url: String
+    let direct: ServiceRouteProbeResult?
+    let proxy: ServiceRouteProbeResult?
+
+    var overallOk: Bool {
+        direct?.ok == true || proxy?.ok == true
+    }
+}
+
 struct MonitorSettings: Codable, Equatable {
     var intervalSeconds: Double
     var timeoutSeconds: Double
@@ -290,6 +356,7 @@ struct MonitorSettings: Codable, Equatable {
     var notifyOnRecovery: Bool
     var ispProfiles: [ISPProfile]
     var activeProfileID: String
+    var criticalServices: [CriticalServiceConfig]
     var notificationCooldownMinutes: Double
     var quietHoursEnabled: Bool
     var quietHoursStart: Int
@@ -310,6 +377,7 @@ struct MonitorSettings: Codable, Equatable {
         case notifyOnRecovery
         case ispProfiles
         case activeProfileID
+        case criticalServices
         case notificationCooldownMinutes
         case quietHoursEnabled
         case quietHoursStart
@@ -332,6 +400,7 @@ struct MonitorSettings: Codable, Equatable {
             notifyOnRecovery: true,
             ispProfiles: [],
             activeProfileID: "",
+            criticalServices: CriticalServiceConfig.defaults,
             notificationCooldownMinutes: 3,
             quietHoursEnabled: false,
             quietHoursStart: 0,
@@ -354,6 +423,7 @@ struct MonitorSettings: Codable, Equatable {
         notifyOnRecovery: Bool,
         ispProfiles: [ISPProfile],
         activeProfileID: String,
+        criticalServices: [CriticalServiceConfig],
         notificationCooldownMinutes: Double,
         quietHoursEnabled: Bool,
         quietHoursStart: Int,
@@ -373,12 +443,14 @@ struct MonitorSettings: Codable, Equatable {
         self.notifyOnRecovery = notifyOnRecovery
         self.ispProfiles = ispProfiles
         self.activeProfileID = activeProfileID
+        self.criticalServices = criticalServices
         self.notificationCooldownMinutes = notificationCooldownMinutes
         self.quietHoursEnabled = quietHoursEnabled
         self.quietHoursStart = quietHoursStart
         self.quietHoursEnd = quietHoursEnd
         self.launchAtLogin = launchAtLogin
         sanitizeProfiles()
+        sanitizeCriticalServices()
     }
 
     init(from decoder: Decoder) throws {
@@ -398,6 +470,7 @@ struct MonitorSettings: Codable, Equatable {
         notifyOnRecovery = try container.decodeIfPresent(Bool.self, forKey: .notifyOnRecovery) ?? defaults.notifyOnRecovery
         ispProfiles = try container.decodeIfPresent([ISPProfile].self, forKey: .ispProfiles) ?? []
         activeProfileID = try container.decodeIfPresent(String.self, forKey: .activeProfileID) ?? ""
+        criticalServices = try container.decodeIfPresent([CriticalServiceConfig].self, forKey: .criticalServices) ?? CriticalServiceConfig.defaults
         notificationCooldownMinutes = try container.decodeIfPresent(Double.self, forKey: .notificationCooldownMinutes) ?? defaults.notificationCooldownMinutes
         quietHoursEnabled = try container.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? defaults.quietHoursEnabled
         quietHoursStart = try container.decodeIfPresent(Int.self, forKey: .quietHoursStart) ?? defaults.quietHoursStart
@@ -405,6 +478,7 @@ struct MonitorSettings: Codable, Equatable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? defaults.launchAtLogin
 
         sanitizeProfiles()
+        sanitizeCriticalServices()
     }
 
     var normalizedInterval: TimeInterval {
@@ -526,6 +600,22 @@ struct MonitorSettings: Codable, Equatable {
                 activeProfileID = first.id
                 first.apply(to: &self)
             }
+        }
+    }
+
+    mutating func sanitizeCriticalServices() {
+        if criticalServices.isEmpty {
+            criticalServices = CriticalServiceConfig.defaults
+            return
+        }
+
+        var seen = Set<String>()
+        criticalServices = criticalServices.filter { service in
+            if seen.contains(service.id) {
+                return false
+            }
+            seen.insert(service.id)
+            return true
         }
     }
 }

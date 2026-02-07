@@ -77,6 +77,54 @@ final class SettingsStore: ObservableObject {
         settings = updated
     }
 
+    func updateCriticalService(
+        id: String,
+        name: String? = nil,
+        url: String? = nil,
+        enabled: Bool? = nil,
+        checkDirect: Bool? = nil,
+        checkProxy: Bool? = nil
+    ) {
+        var updated = settings
+        guard let index = updated.criticalServices.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        if let name {
+            updated.criticalServices[index].name = name
+        }
+        if let url {
+            updated.criticalServices[index].url = url
+        }
+        if let enabled {
+            updated.criticalServices[index].enabled = enabled
+        }
+        if let checkDirect {
+            updated.criticalServices[index].checkDirect = checkDirect
+        }
+        if let checkProxy {
+            updated.criticalServices[index].checkProxy = checkProxy
+        }
+        updated.sanitizeCriticalServices()
+        settings = updated
+    }
+
+    func addCriticalService() {
+        var updated = settings
+        updated.criticalServices.append(
+            CriticalServiceConfig(name: "New Service", url: "https://")
+        )
+        updated.sanitizeCriticalServices()
+        settings = updated
+    }
+
+    func removeCriticalService(id: String) {
+        var updated = settings
+        updated.criticalServices.removeAll { $0.id == id }
+        updated.sanitizeCriticalServices()
+        settings = updated
+    }
+
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             try LoginItemManager.setEnabled(enabled)
