@@ -19,7 +19,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
         case .vpnOK:
             return "VPN OK"
         case .vpnOrProxyActive:
-            return "VPN/PROXY"
+            return "VPN ACTIVE"
         case .openInternet:
             return "OPEN"
         }
@@ -36,7 +36,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
         case .vpnOK:
             return "Blocked targets reachable through proxy"
         case .vpnOrProxyActive:
-            return "Traffic routed by VPN/PROXY overlay"
+            return "Traffic routed by VPN overlay"
         case .openInternet:
             return "Blocked targets reachable without proxy"
         }
@@ -56,21 +56,6 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return 3
         case .openInternet:
             return 4
-        }
-    }
-
-    var colorName: String {
-        switch self {
-        case .offline:
-            return "red"
-        case .domesticOnly:
-            return "orange"
-        case .globalLimited:
-            return "yellow"
-        case .vpnOK, .openInternet:
-            return "green"
-        case .vpnOrProxyActive:
-            return "yellow"
         }
     }
 
@@ -134,11 +119,11 @@ enum ConnectivityState: String, Codable, CaseIterable {
         case .domesticOnly:
             return "Domestic routes are up. Keep ISP and rotate VPN config."
         case .globalLimited:
-            return "Global web works. VPN route likely blocked; rotate tunnel/profile."
+            return "Global web works. VPN route likely blocked; rotate VPN profile."
         case .vpnOK:
             return "You are connected through VPN. Keep this config and monitor stability."
         case .vpnOrProxyActive:
-            return "Direct-path verdict is paused. Disable VPN/PROXY to test raw internet directly."
+            return "Direct-path verdict is paused. Disable VPN to test raw internet directly."
         case .openInternet:
             return "Direct access is currently open. VPN is optional unless needed."
         }
@@ -251,14 +236,56 @@ enum SettingsPreset: String, CaseIterable, Identifiable {
     }
 }
 
+enum ProbeKind: String, Codable, CaseIterable, Identifiable {
+    case domestic
+    case global
+    case restrictedDirect
+    case restrictedViaProxy
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .domestic:
+            return "Domestic"
+        case .global:
+            return "Global"
+        case .restrictedDirect:
+            return "Restricted (Direct)"
+        case .restrictedViaProxy:
+            return "Restricted (Via PROXY)"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .domestic:
+            return "house.circle.fill"
+        case .global:
+            return "globe.europe.africa.fill"
+        case .restrictedDirect:
+            return "paperplane.circle.fill"
+        case .restrictedViaProxy:
+            return "lock.shield.fill"
+        }
+    }
+}
+
 struct ProbeResult: Codable, Equatable, Identifiable {
-    let id: String
-    let name: String
+    let kind: ProbeKind
     let target: String
     let ok: Bool
     let statusCode: Int?
     let latencyMs: Int?
     let error: String?
+
+    var id: String {
+        kind.rawValue
+    }
+
+    var name: String {
+        kind.title
+    }
 
     var summary: String {
         if ok {
@@ -280,18 +307,7 @@ struct ProbeResult: Codable, Equatable, Identifiable {
     }
 
     var systemImage: String {
-        switch id {
-        case "domestic":
-            return "house.circle.fill"
-        case "global":
-            return "globe.europe.africa.fill"
-        case "blocked_direct":
-            return "paperplane.circle.fill"
-        case "blocked_proxy":
-            return "lock.shield.fill"
-        default:
-            return "dot.circle"
-        }
+        kind.systemImage
     }
 }
 
