@@ -3,6 +3,18 @@ import Foundation
 import Network
 
 final class ProbeEngine {
+    private actor ResumeGate {
+        private var resumed = false
+
+        func claim() -> Bool {
+            guard !resumed else {
+                return false
+            }
+            resumed = true
+            return true
+        }
+    }
+
     private struct ProxySessionKey: Equatable {
         let host: String
         let port: Int
@@ -259,31 +271,24 @@ final class ProbeEngine {
 
         let connection = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: .tcp)
         return await withCheckedContinuation { continuation in
-            let lock = NSLock()
-            var didResume = false
+            let resumeGate = ResumeGate()
+            let finish: @Sendable (Bool) -> Void = { value in
+                Task {
+                    guard await resumeGate.claim() else {
+                        return
+                    }
+                    connection.stateUpdateHandler = nil
+                    connection.cancel()
+                    continuation.resume(returning: value)
+                }
+            }
 
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    lock.lock()
-                    defer { lock.unlock() }
-                    guard !didResume else {
-                        return
-                    }
-                    didResume = true
-                    connection.stateUpdateHandler = nil
-                    connection.cancel()
-                    continuation.resume(returning: true)
+                    finish(true)
                 case .failed, .cancelled:
-                    lock.lock()
-                    defer { lock.unlock() }
-                    guard !didResume else {
-                        return
-                    }
-                    didResume = true
-                    connection.stateUpdateHandler = nil
-                    connection.cancel()
-                    continuation.resume(returning: false)
+                    finish(false)
                 default:
                     break
                 }
@@ -292,15 +297,7 @@ final class ProbeEngine {
             connection.start(queue: .global(qos: .utility))
 
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !didResume else {
-                    return
-                }
-                didResume = true
-                connection.stateUpdateHandler = nil
-                connection.cancel()
-                continuation.resume(returning: false)
+                finish(false)
             }
         }
     }
