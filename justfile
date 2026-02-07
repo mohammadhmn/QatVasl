@@ -10,7 +10,6 @@ archive_path := "build/QatVasl.xcarchive"
 debug_app := "build/DerivedData/Build/Products/Debug/QatVasl.app"
 release_app := "build/DerivedData/Build/Products/Release/QatVasl.app"
 dmg_path := "build/dist/QatVasl.dmg"
-xcodebuild_base := "xcodebuild -project \"{{project}}\" -scheme \"{{scheme}}\" -destination 'platform=macOS' -derivedDataPath \"{{derived_data}}\""
 
 default:
     @just --list
@@ -23,7 +22,7 @@ doctor:
     xcodebuild -list -project "{{project}}"
 
 build configuration="Debug":
-    {{xcodebuild_base}} -configuration "{{configuration}}" CODE_SIGNING_ALLOWED=NO build
+    xcodebuild -project "{{project}}" -scheme "{{scheme}}" -destination 'platform=macOS' -derivedDataPath "{{derived_data}}" -configuration "{{configuration}}" CODE_SIGNING_ALLOWED=NO build
 
 build-debug:
     just build Debug
@@ -44,7 +43,7 @@ run-release:
     just run Release
 
 clean:
-    {{xcodebuild_base}} -configuration Debug clean || true
+    xcodebuild -project "{{project}}" -scheme "{{scheme}}" -destination 'platform=macOS' -derivedDataPath "{{derived_data}}" -configuration Debug clean || true
     rm -rf "{{build_root}}"
 
 archive:
