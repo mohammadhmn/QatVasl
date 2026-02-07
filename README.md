@@ -1,72 +1,106 @@
 # QatVasl
 
-QatVasl is a native macOS menu-bar app for monitoring unstable/restricted internet connectivity.
+QatVasl is a native macOS menu bar app for monitoring unstable or restricted internet connectivity.
 
-It is designed for environments where you constantly switch ISP and VPN configs and need quick, reliable status without manual checks.
+It is built for users who frequently switch between direct internet, VPN, and local proxy routes and need a fast, reliable signal of "is my network usable right now?".
 
-## Quick Start
+## Highlights
 
-1. Open the project in Xcode:
-   - `QatVasl.xcodeproj`
-2. Build and run:
-   - Press `⌘R` in Xcode
-3. Or from terminal:
-   - `just dev`
+- Native macOS menu bar app (SwiftUI)
+- Continuous connectivity probe cycles
+- Clear status model: `CHECKING`, `USABLE`, `DEGRADED`, `OFFLINE`
+- Route awareness: `DIRECT`, `VPN`, `PROXY`, `VPN + PROXY`
+- Service checks for direct and proxy paths
+- Dashboard with health, diagnostics, and timeline metrics
+- Stays active in the menu bar when window closes
 
-After launch, QatVasl appears in the menu bar.  
-Closing dashboard window (`⌘W`) keeps QatVasl alive in menu bar and removes it from Dock.
+## How It Works
 
-## Probe Set
+Each probe cycle checks multiple endpoints and route signals, then computes:
 
-Each cycle it probes:
-- Domestic reachability (default: `https://www.aparat.com/`)
-- Global reachability (default: `https://www.google.com/generate_204`)
-- Restricted service via direct path (default: `https://web.telegram.org/`)
-- Restricted service via configured proxy endpoint (default: `127.0.0.1:10808`, SOCKS5)
+- A top-level connectivity state (usable/degraded/offline)
+- Active route interpretation (direct/vpn/proxy/both)
+- Actionable diagnostics for quick troubleshooting
 
-## Status and Route Model
+Default checks include:
 
-Top-level status:
-- `CHECKING`: a probe cycle is in progress.
-- `USABLE`: internet is currently usable for your configured workflow.
-- `DEGRADED`: some routes/services work, but not enough for normal use.
-- `OFFLINE`: no reliable route detected.
+- Domestic reachability: `https://www.aparat.com/`
+- Global reachability: `https://www.google.com/generate_204`
+- Restricted direct route: `https://web.telegram.org/`
+- Proxy endpoint: `127.0.0.1:10808` (SOCKS5)
 
-Route indicators:
-- `DIRECT`: no system VPN route and no working proxy route.
-- `VPN`: system TUN/VPN overlay route is active.
-- `PROXY`: configured proxy endpoint is active and proxied probe succeeds.
-- `VPN + PROXY`: both VPN and proxy route are active.
+## Tech Stack
 
-## Core Features
+- Swift
+- SwiftUI
+- Xcode project-based build
+- `just` task runner for local workflows
 
-- Plain-language diagnosis with recommended actions.
-- Critical services matrix (direct vs proxy per service).
-- 24h timeline metrics (uptime, drops, latency, recovery).
-- ISP profiles for quick switching.
-- Notification cooldown + quiet hours.
-- Diagnostics export (`Export report`) for support/debug sharing.
+## Getting Started
 
-## Documentation Map
+### Requirements
 
-Start here:
-- Docs index: `docs/README.md`
+- macOS
+- Xcode
+- `just` (optional, recommended)
 
-Core docs:
-- `docs/01-context-and-requirements.md`
-- `docs/02-implementation-and-worklog.md`
-- `docs/03-daily-ops-checklist.md`
+Install `just`:
 
-Beginner track (recommended for first-time Swift/macOS developers):
-- `docs/04-zero-to-running-qatvasl.md`
-- `docs/05-swift-swiftui-macos-primer.md`
-- `docs/06-codebase-walkthrough.md`
-- `docs/07-build-run-package-playbook.md`
-- `docs/08-troubleshooting-and-faq.md`
+```bash
+brew install just
+```
+
+### Run in Xcode
+
+1. Open `QatVasl.xcodeproj`
+2. Select scheme `QatVasl`
+3. Press `Cmd+R`
+
+### Run from Terminal
+
+```bash
+just dev
+```
 
 ## Common Commands
 
-- `just dev`
-- `just build-debug`
-- `just build-release`
-- `just dmg`
+```bash
+just doctor         # Check Xcode setup and project schemes
+just dev            # Build/run Debug
+just build-debug    # Debug build
+just build-release  # Release build
+just dmg            # Build dmg in build/dist/
+just logs           # Stream app logs
+just reset-settings # Reset app defaults
+```
+
+## Project Structure
+
+- `QatVasl/` application source code
+- `QatVasl.xcodeproj/` Xcode project
+- `docs/` onboarding, architecture notes, troubleshooting, roadmap
+- `justfile` development and packaging commands
+
+## Documentation
+
+Start at `docs/README.md`.
+
+Recommended order for new contributors:
+
+1. `docs/04-zero-to-running-qatvasl.md`
+2. `docs/05-swift-swiftui-macos-primer.md`
+3. `docs/06-codebase-walkthrough.md`
+4. `docs/07-build-run-package-playbook.md`
+5. `docs/08-troubleshooting-and-faq.md`
+
+## Contributing
+
+Contributions are welcome. Please read `CONTRIBUTING.md` first.
+
+## Security
+
+If you find a vulnerability, please follow `SECURITY.md`.
+
+## License
+
+MIT License. See `LICENSE`.
