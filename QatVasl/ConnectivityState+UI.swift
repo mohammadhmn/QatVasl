@@ -9,6 +9,8 @@ extension ConnectivityState {
             return .red
         case .degraded:
             return .yellow
+        case .vpnIssue:
+            return .orange
         case .usable:
             return .mint
         }

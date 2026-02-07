@@ -11,12 +11,12 @@ enum ConnectivityStateEvaluator {
         let routeLine = RouteSummaryFormatter.format(vpnActive: routeContext.vpnActive, proxyActive: proxyActive)
 
         if routeContext.vpnActive {
-            if snapshot.global.ok || snapshot.blockedProxy.ok || snapshot.blockedDirect.ok {
+            if snapshot.blockedProxy.ok || snapshot.blockedDirect.ok {
                 return ConnectivityAssessment(
                     state: .usable,
                     diagnosis: ConnectivityDiagnosis(
                         title: "VPN route is active",
-                        explanation: "Traffic is currently routed through a system VPN/TUN path, so direct-path checks are not authoritative.",
+                        explanation: "Traffic is currently routed through a system VPN/TUN path and restricted-service checks are passing.",
                         actions: [
                             "Keep VPN connected if your apps are working.",
                             "Use Refresh Now after VPN node/profile changes.",
@@ -28,11 +28,28 @@ enum ConnectivityStateEvaluator {
                 )
             }
 
+            if snapshot.global.ok || snapshot.domestic.ok {
+                return ConnectivityAssessment(
+                    state: .vpnIssue,
+                    diagnosis: ConnectivityDiagnosis(
+                        title: "VPN tunnel is up, but blocked routes fail",
+                        explanation: "TUN is active and basic internet may still work, but restricted-service checks fail through the current VPN path.",
+                        actions: [
+                            "Reconnect VPN and rotate to another node/profile.",
+                            "If using Happ/OpenVPN TUN, restart the tunnel service.",
+                            "Run Refresh Now and confirm restricted-service probe recovery.",
+                        ]
+                    ),
+                    routeIndicators: routeIndicators,
+                    detailLine: routeLine
+                )
+            }
+
             return ConnectivityAssessment(
-                state: .offline,
+                state: .vpnIssue,
                 diagnosis: ConnectivityDiagnosis(
-                    title: "VPN is connected but internet is still down",
-                    explanation: "The TUN route is active but probes fail, which usually means the VPN tunnel is stale or upstream is blocked.",
+                    title: "VPN tunnel is up but not passing traffic",
+                    explanation: "The TUN route is active, but all probes fail. This usually means the VPN tunnel is stale, broken, or upstream is blocked.",
                     actions: [
                         "Reconnect VPN and try a different server/profile.",
                         "Switch ISP and re-check.",

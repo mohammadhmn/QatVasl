@@ -60,28 +60,28 @@ final class NetworkMonitor: ObservableObject {
             return .empty
         }
 
-        let uptimeCount = recent.filter { $0.state != .offline }.count
+        let uptimeCount = recent.filter { $0.state != .offline && $0.state != .vpnIssue }.count
         let uptimePercent = Int((Double(uptimeCount) / Double(recent.count) * 100).rounded())
         let averageLatencyValues = recent.compactMap(\.averageLatencyMs)
         let averageLatencyMs = averageLatencyValues.isEmpty
             ? nil
             : Int((Double(averageLatencyValues.reduce(0, +)) / Double(averageLatencyValues.count)).rounded())
         let dropCount = transitionHistory.filter {
-            $0.timestamp >= Date().addingTimeInterval(-24 * 60 * 60) && $0.to == .offline
+            $0.timestamp >= Date().addingTimeInterval(-24 * 60 * 60) && ($0.to == .offline || $0.to == .vpnIssue)
         }.count
 
         let orderedSamples = recent.sorted { $0.timestamp < $1.timestamp }
-        var offlineStart: Date?
+        var outageStart: Date?
         var recoveries: [TimeInterval] = []
 
         for sample in orderedSamples {
-            if sample.state == .offline {
-                if offlineStart == nil {
-                    offlineStart = sample.timestamp
+            if sample.state == .offline || sample.state == .vpnIssue {
+                if outageStart == nil {
+                    outageStart = sample.timestamp
                 }
-            } else if let start = offlineStart {
+            } else if let start = outageStart {
                 recoveries.append(sample.timestamp.timeIntervalSince(start))
-                offlineStart = nil
+                outageStart = nil
             }
         }
 

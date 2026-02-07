@@ -4,6 +4,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
     case checking
     case offline
     case degraded
+    case vpnIssue
     case usable
 
     var shortLabel: String {
@@ -14,6 +15,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "OFFLINE"
         case .degraded:
             return "DEGRADED"
+        case .vpnIssue:
+            return "VPN ISSUE"
         case .usable:
             return "USABLE"
         }
@@ -27,6 +30,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "No reliable connectivity"
         case .degraded:
             return "Internet is partially available"
+        case .vpnIssue:
+            return "VPN/TUN is up but restricted route is failing"
         case .usable:
             return "Internet is currently usable"
         }
@@ -40,6 +45,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return 0
         case .degraded:
             return 1
+        case .vpnIssue:
+            return 0
         case .usable:
             return 2
         }
@@ -53,6 +60,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "wifi.slash.circle.fill"
         case .degraded:
             return "wifi.exclamationmark"
+        case .vpnIssue:
+            return "shield.slash.fill"
         case .usable:
             return "checkmark.seal.fill"
         }
@@ -70,6 +79,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "OFF"
         case .degraded:
             return "DEG"
+        case .vpnIssue:
+            return "VPN!"
         case .usable:
             return "OK"
         }
@@ -83,6 +94,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "🔴"
         case .degraded:
             return "🟡"
+        case .vpnIssue:
+            return "🟠"
         case .usable:
             return "🟢"
         }
