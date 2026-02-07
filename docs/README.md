@@ -9,12 +9,14 @@ If you are completely new to Swift/SwiftUI/macOS development, follow this order:
 3. `docs/06-codebase-walkthrough.md`
 4. `docs/07-build-run-package-playbook.md`
 5. `docs/08-troubleshooting-and-faq.md`
+6. `docs/09-v2-roadmap-and-feature-plan.md`
 
 Operational/project context docs:
 
 - `docs/01-context-and-requirements.md`
 - `docs/02-implementation-and-worklog.md`
 - `docs/03-daily-ops-checklist.md`
+- `docs/09-v2-roadmap-and-feature-plan.md`
 
 ---
 
@@ -31,3 +33,5 @@ Operational/project context docs:
   - `docs/07-build-run-package-playbook.md`
 - Something is broken:
   - `docs/08-troubleshooting-and-faq.md`
+- I want to see the full feature roadmap:
+  - `docs/09-v2-roadmap-and-feature-plan.md`
