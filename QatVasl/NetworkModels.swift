@@ -341,6 +341,8 @@ struct CriticalServiceConfig: Codable, Equatable, Identifiable {
             CriticalServiceConfig(name: "Telegram", url: "https://web.telegram.org/"),
             CriticalServiceConfig(name: "GitHub", url: "https://github.com/"),
             CriticalServiceConfig(name: "Google", url: "https://www.google.com/"),
+            CriticalServiceConfig(name: "Stack Overflow", url: "https://stackoverflow.com/"),
+            CriticalServiceConfig(name: "NPM Registry", url: "https://registry.npmjs.org/"),
         ]
     }
 }
