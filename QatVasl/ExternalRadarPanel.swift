@@ -50,86 +50,114 @@ struct ExternalRadarPanel: View {
     @State private var lastError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            GlassCard(cornerRadius: 16, tint: .orange.opacity(0.14)) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("External Radar Panel")
-                                .font(.headline)
-                            Text("WKWebView scaffold for Cloudflare/Arvan/Vanillapp (no API coupling).")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Close") {
-                            dismiss()
-                        }
-                        .buttonStyle(.glass)
-                    }
+        VStack(alignment: .leading, spacing: 14) {
+            headerCard
+            controlsCard
+            webContainer
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 24)
+        .frame(minWidth: 980, minHeight: 720, alignment: .topLeading)
+        .preferredColorScheme(.dark)
+    }
 
-                    HStack(spacing: 8) {
-                        Picker("Radar site", selection: $selectedSite) {
-                            ForEach(ExternalRadarSite.allCases) { site in
-                                Text(site.title).tag(site)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        Button {
-                            reloadToken = UUID()
-                        } label: {
-                            Label("Reload", systemImage: "arrow.clockwise")
-                        }
-                        .buttonStyle(.glass)
-
-                        Button {
-                            NSWorkspace.shared.open(selectedSite.url)
-                        } label: {
-                            Label("Open in Browser", systemImage: "safari")
-                        }
-                        .buttonStyle(.glassProminent)
-                    }
-
-                    Text(selectedSite.helpText)
+    private var headerCard: some View {
+        GlassCard(cornerRadius: 14, tint: .orange.opacity(0.10)) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("External Radar Panel")
+                        .font(.headline)
+                    Text("Live website view for Cloudflare, Arvan, and Vanillapp (no API coupling).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Spacer(minLength: 8)
+
+                Button("Close") {
+                    dismiss()
+                }
+                .buttonStyle(.glass)
             }
+        }
+    }
 
-            GlassCard(cornerRadius: 16, tint: .gray.opacity(0.08)) {
-                VStack(alignment: .leading, spacing: 8) {
-                    RadarWebView(
-                        url: selectedSite.url,
-                        reloadToken: reloadToken,
-                        statusMessage: $statusMessage,
-                        lastError: $lastError
-                    )
-                    .frame(minWidth: 880, minHeight: 560)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                    HStack {
-                        Text(statusMessage)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(selectedSite.url.absoluteString)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+    private var controlsCard: some View {
+        GlassCard(cornerRadius: 14, tint: .cyan.opacity(0.08)) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Picker("Radar site", selection: $selectedSite) {
+                        ForEach(ExternalRadarSite.allCases) { site in
+                            Text(site.title).tag(site)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 360)
 
-                    if let lastError, !lastError.isEmpty {
-                        Text("WebView notice: \(lastError)")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                    Spacer(minLength: 8)
+
+                    Button {
+                        reloadToken = UUID()
+                    } label: {
+                        Label("Reload", systemImage: "arrow.clockwise")
                     }
+                    .buttonStyle(.glass)
+
+                    Button {
+                        NSWorkspace.shared.open(selectedSite.url)
+                    } label: {
+                        Label("Open in Browser", systemImage: "safari")
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+
+                Text(selectedSite.helpText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    private var webContainer: some View {
+        GlassCard(cornerRadius: 14, tint: .gray.opacity(0.06)) {
+            VStack(alignment: .leading, spacing: 10) {
+                RadarWebView(
+                    url: selectedSite.url,
+                    reloadToken: reloadToken,
+                    statusMessage: $statusMessage,
+                    lastError: $lastError
+                )
+                .frame(maxWidth: .infinity, minHeight: 560, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(.white.opacity(0.08), lineWidth: 0.6)
+                )
+
+                HStack(spacing: 10) {
+                    Text(statusMessage)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(selectedSite.url.host() ?? selectedSite.url.absoluteString)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let lastError, !lastError.isEmpty {
+                    Text("WebView notice: \(lastError)")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
                 }
             }
         }
-        .padding(16)
-        .frame(minWidth: 980, minHeight: 720)
-        .preferredColorScheme(.dark)
     }
 }
 
