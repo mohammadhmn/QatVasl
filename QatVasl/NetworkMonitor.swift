@@ -29,6 +29,7 @@ final class NetworkMonitor: ObservableObject {
     private var loopTask: Task<Void, Never>?
     private var settingsObserver: AnyCancellable?
     private var notificationsAllowed = false
+    private var lastNotificationSentAt: Date?
     private var hasCompletedFirstCheck = false
 
     var displayState: ConnectivityState {
@@ -250,23 +251,34 @@ final class NetworkMonitor: ObservableObject {
             return
         }
 
+        let now = Date()
+        if !shouldSendNotification(at: now, settings: settings) {
+            return
+        }
+
         if current.severity < previous.severity {
-            await sendNotification(
+            let didSend = await sendNotification(
                 title: "QatVasl: Connectivity degraded",
                 body: current.detail
             )
+            if didSend {
+                lastNotificationSentAt = now
+            }
             return
         }
 
         if current.severity > previous.severity && settings.notifyOnRecovery {
-            await sendNotification(
+            let didSend = await sendNotification(
                 title: "QatVasl: Connectivity recovered",
                 body: current.detail
             )
+            if didSend {
+                lastNotificationSentAt = now
+            }
         }
     }
 
-    private func sendNotification(title: String, body: String) async {
+    private func sendNotification(title: String, body: String) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -277,7 +289,12 @@ final class NetworkMonitor: ObservableObject {
             content: content,
             trigger: nil
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func appendTransition(from: ConnectivityState, to: ConnectivityState, at timestamp: Date) {
@@ -349,5 +366,38 @@ final class NetworkMonitor: ObservableObject {
             return .checking
         }
         return ConnectivityState.fromStoredRawValue(rawState) ?? .checking
+    }
+
+    private func shouldSendNotification(at date: Date, settings: MonitorSettings) -> Bool {
+        let cooldown = settings.normalizedNotificationCooldown
+        if
+            cooldown > 0,
+            let lastNotificationSentAt,
+            date.timeIntervalSince(lastNotificationSentAt) < cooldown
+        {
+            return false
+        }
+
+        if settings.quietHoursEnabled, isWithinQuietHours(date: date, settings: settings) {
+            return false
+        }
+
+        return true
+    }
+
+    private func isWithinQuietHours(date: Date, settings: MonitorSettings) -> Bool {
+        let hour = Calendar.current.component(.hour, from: date)
+        let start = settings.normalizedQuietHoursStart
+        let end = settings.normalizedQuietHoursEnd
+
+        if start == end {
+            return true
+        }
+
+        if start < end {
+            return hour >= start && hour < end
+        }
+
+        return hour >= start || hour < end
     }
 }

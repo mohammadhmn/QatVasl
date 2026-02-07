@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct SettingsView: View {
@@ -121,6 +122,41 @@ struct SettingsView: View {
 
                         Toggle("Enable notifications", isOn: binding(\.notificationsEnabled))
                         Toggle("Notify on recovery", isOn: binding(\.notifyOnRecovery))
+
+                        HStack {
+                            Text("Alert cooldown")
+                            Spacer()
+                            Stepper(value: binding(\.notificationCooldownMinutes), in: 0...30, step: 1) {
+                                Text("\(Int(settingsStore.settings.notificationCooldownMinutes)) min")
+                                    .frame(width: 90, alignment: .trailing)
+                            }
+                            .frame(width: 170)
+                        }
+
+                        Toggle("Quiet hours", isOn: binding(\.quietHoursEnabled))
+
+                        if settingsStore.settings.quietHoursEnabled {
+                            HStack {
+                                Text("From")
+                                Spacer()
+                                Stepper(value: binding(\.quietHoursStart), in: 0...23, step: 1) {
+                                    Text(hourLabel(settingsStore.settings.quietHoursStart))
+                                        .frame(width: 90, alignment: .trailing)
+                                }
+                                .frame(width: 170)
+                            }
+
+                            HStack {
+                                Text("To")
+                                Spacer()
+                                Stepper(value: binding(\.quietHoursEnd), in: 0...23, step: 1) {
+                                    Text(hourLabel(settingsStore.settings.quietHoursEnd))
+                                        .frame(width: 90, alignment: .trailing)
+                                }
+                                .frame(width: 170)
+                            }
+                        }
+
                         Toggle(
                             "Launch at login",
                             isOn: Binding(
@@ -167,5 +203,9 @@ struct SettingsView: View {
                 settingsStore.settings = updated
             }
         )
+    }
+
+    private func hourLabel(_ hour: Int) -> String {
+        String(format: "%02d:00", max(0, min(hour, 23)))
     }
 }

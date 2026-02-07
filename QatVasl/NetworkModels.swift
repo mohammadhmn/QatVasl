@@ -220,7 +220,30 @@ struct MonitorSettings: Codable, Equatable {
     var proxyPort: Int
     var notificationsEnabled: Bool
     var notifyOnRecovery: Bool
+    var notificationCooldownMinutes: Double
+    var quietHoursEnabled: Bool
+    var quietHoursStart: Int
+    var quietHoursEnd: Int
     var launchAtLogin: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case intervalSeconds
+        case timeoutSeconds
+        case domesticURL
+        case globalURL
+        case blockedURL
+        case proxyEnabled
+        case proxyType
+        case proxyHost
+        case proxyPort
+        case notificationsEnabled
+        case notifyOnRecovery
+        case notificationCooldownMinutes
+        case quietHoursEnabled
+        case quietHoursStart
+        case quietHoursEnd
+        case launchAtLogin
+    }
 
     static var defaults: MonitorSettings {
         MonitorSettings(
@@ -235,8 +258,70 @@ struct MonitorSettings: Codable, Equatable {
             proxyPort: 10808,
             notificationsEnabled: true,
             notifyOnRecovery: true,
+            notificationCooldownMinutes: 3,
+            quietHoursEnabled: false,
+            quietHoursStart: 0,
+            quietHoursEnd: 7,
             launchAtLogin: false
         )
+    }
+
+    init(
+        intervalSeconds: Double,
+        timeoutSeconds: Double,
+        domesticURL: String,
+        globalURL: String,
+        blockedURL: String,
+        proxyEnabled: Bool,
+        proxyType: ProxyType,
+        proxyHost: String,
+        proxyPort: Int,
+        notificationsEnabled: Bool,
+        notifyOnRecovery: Bool,
+        notificationCooldownMinutes: Double,
+        quietHoursEnabled: Bool,
+        quietHoursStart: Int,
+        quietHoursEnd: Int,
+        launchAtLogin: Bool
+    ) {
+        self.intervalSeconds = intervalSeconds
+        self.timeoutSeconds = timeoutSeconds
+        self.domesticURL = domesticURL
+        self.globalURL = globalURL
+        self.blockedURL = blockedURL
+        self.proxyEnabled = proxyEnabled
+        self.proxyType = proxyType
+        self.proxyHost = proxyHost
+        self.proxyPort = proxyPort
+        self.notificationsEnabled = notificationsEnabled
+        self.notifyOnRecovery = notifyOnRecovery
+        self.notificationCooldownMinutes = notificationCooldownMinutes
+        self.quietHoursEnabled = quietHoursEnabled
+        self.quietHoursStart = quietHoursStart
+        self.quietHoursEnd = quietHoursEnd
+        self.launchAtLogin = launchAtLogin
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = MonitorSettings.defaults
+
+        intervalSeconds = try container.decodeIfPresent(Double.self, forKey: .intervalSeconds) ?? defaults.intervalSeconds
+        timeoutSeconds = try container.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? defaults.timeoutSeconds
+        domesticURL = try container.decodeIfPresent(String.self, forKey: .domesticURL) ?? defaults.domesticURL
+        globalURL = try container.decodeIfPresent(String.self, forKey: .globalURL) ?? defaults.globalURL
+        blockedURL = try container.decodeIfPresent(String.self, forKey: .blockedURL) ?? defaults.blockedURL
+        proxyEnabled = try container.decodeIfPresent(Bool.self, forKey: .proxyEnabled) ?? defaults.proxyEnabled
+        proxyType = try container.decodeIfPresent(ProxyType.self, forKey: .proxyType) ?? defaults.proxyType
+        proxyHost = try container.decodeIfPresent(String.self, forKey: .proxyHost) ?? defaults.proxyHost
+        proxyPort = try container.decodeIfPresent(Int.self, forKey: .proxyPort) ?? defaults.proxyPort
+        notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? defaults.notificationsEnabled
+        notifyOnRecovery = try container.decodeIfPresent(Bool.self, forKey: .notifyOnRecovery) ?? defaults.notifyOnRecovery
+        notificationCooldownMinutes = try container.decodeIfPresent(Double.self, forKey: .notificationCooldownMinutes) ?? defaults.notificationCooldownMinutes
+        quietHoursEnabled = try container.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? defaults.quietHoursEnabled
+        quietHoursStart = try container.decodeIfPresent(Int.self, forKey: .quietHoursStart) ?? defaults.quietHoursStart
+        quietHoursEnd = try container.decodeIfPresent(Int.self, forKey: .quietHoursEnd) ?? defaults.quietHoursEnd
+        launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? defaults.launchAtLogin
     }
 
     var normalizedInterval: TimeInterval {
@@ -247,6 +332,18 @@ struct MonitorSettings: Codable, Equatable {
         max(2, min(timeoutSeconds, 30))
     }
 
+    var normalizedNotificationCooldown: TimeInterval {
+        max(0, min(notificationCooldownMinutes, 120)) * 60
+    }
+
+    var normalizedQuietHoursStart: Int {
+        max(0, min(quietHoursStart, 23))
+    }
+
+    var normalizedQuietHoursEnd: Int {
+        max(0, min(quietHoursEnd, 23))
+    }
+
     mutating func applyPreset(_ preset: SettingsPreset) {
         switch preset {
         case .balancedIran:
@@ -254,16 +351,24 @@ struct MonitorSettings: Codable, Equatable {
             timeoutSeconds = 7
             notificationsEnabled = true
             notifyOnRecovery = true
+            notificationCooldownMinutes = 3
+            quietHoursEnabled = false
         case .rapidFailover:
             intervalSeconds = 12
             timeoutSeconds = 4
             notificationsEnabled = true
             notifyOnRecovery = true
+            notificationCooldownMinutes = 1
+            quietHoursEnabled = false
         case .stableQuiet:
             intervalSeconds = 60
             timeoutSeconds = 8
             notificationsEnabled = true
             notifyOnRecovery = false
+            notificationCooldownMinutes = 10
+            quietHoursEnabled = true
+            quietHoursStart = 0
+            quietHoursEnd = 7
         }
     }
 }
