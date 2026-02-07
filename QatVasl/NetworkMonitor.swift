@@ -14,6 +14,9 @@ final class NetworkMonitor: ObservableObject {
         static let transitionHistory = 40
         static let healthSampleHistory = 2_000
         static let healthSampleRetentionSeconds: TimeInterval = 7 * 24 * 60 * 60
+        static let settingsRestartDebounceMs = 700
+        static let persistenceCoalesceSeconds: TimeInterval = 3
+        static let persistenceMinFlushIntervalSeconds: TimeInterval = 45
     }
 
     @Published private(set) var currentState: ConnectivityState
@@ -41,9 +44,13 @@ final class NetworkMonitor: ObservableObject {
 
     private var loopTask: Task<Void, Never>?
     private var settingsObserver: AnyCancellable?
+    private var persistenceFlushTask: Task<Void, Never>?
     private var notificationsAllowed = false
     private var lastNotificationSentAt: Date?
     private var lastCriticalServicesCheckAt: Date?
+    private var lastPersistenceFlushAt: Date?
+    private var pendingHistoryPersistence = false
+    private var pendingSamplesPersistence = false
     private var hasCompletedFirstCheck = false
 
     var displayState: ConnectivityState {
@@ -130,21 +137,23 @@ final class NetworkMonitor: ObservableObject {
 
         settingsObserver = settingsStore.$settings
             .dropFirst()
+            .map(\.normalizedInterval)
             .removeDuplicates()
-            .debounce(for: .milliseconds(350), scheduler: RunLoop.main)
+            .debounce(for: .milliseconds(Limits.settingsRestartDebounceMs), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.restartLoop()
+                self?.restartLoop(runImmediately: false)
             }
 
         Task { [weak self] in
             await self?.prepareNotifications()
         }
 
-        restartLoop()
+        restartLoop(runImmediately: true)
     }
 
     deinit {
         loopTask?.cancel()
+        persistenceFlushTask?.cancel()
     }
 
     func refreshNow() {
@@ -156,15 +165,21 @@ final class NetworkMonitor: ObservableObject {
     func clearHistory() {
         transitionHistory = []
         healthSamples = []
+        pendingHistoryPersistence = false
+        pendingSamplesPersistence = false
+        persistenceFlushTask?.cancel()
+        persistenceFlushTask = nil
         defaults.removeObject(forKey: historyKey)
         defaults.removeObject(forKey: samplesKey)
     }
 
-    private func restartLoop() {
+    private func restartLoop(runImmediately: Bool) {
         loopTask?.cancel()
         loopTask = Task { [weak self] in
             guard let self else { return }
-            await runCheck()
+            if runImmediately {
+                await runCheck()
+            }
             while !Task.isCancelled {
                 let interval = settingsStore.settings.normalizedInterval
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
@@ -237,14 +252,23 @@ final class NetworkMonitor: ObservableObject {
         let previous = currentState
         let next = assessment.state
 
-        currentState = next
-        diagnosis = assessment.diagnosis
-        routeIndicators = assessment.routeIndicators
-        defaults.set(next.rawValue, forKey: stateKey)
+        if currentState != next {
+            currentState = next
+            defaults.set(next.rawValue, forKey: stateKey)
+        }
+        if diagnosis != assessment.diagnosis {
+            diagnosis = assessment.diagnosis
+        }
+        if routeIndicators != assessment.routeIndicators {
+            routeIndicators = assessment.routeIndicators
+        }
 
         lastSnapshot = snapshot
         lastCheckedAt = snapshot.timestamp
-        latestError = snapshot.allResults.first(where: { !$0.ok })?.error
+        let nextError = snapshot.allResults.first(where: { !$0.ok })?.error
+        if latestError != nextError {
+            latestError = nextError
+        }
         appendHealthSample(state: next, snapshot: snapshot, timestamp: snapshot.timestamp)
 
         return StateChange(previous: previous, current: next, timestamp: snapshot.timestamp)
@@ -337,9 +361,8 @@ final class NetworkMonitor: ObservableObject {
         }
         transitionHistory = updated
 
-        if let data = try? JSONEncoder().encode(updated) {
-            defaults.set(data, forKey: historyKey)
-        }
+        pendingHistoryPersistence = true
+        schedulePersistenceFlushIfNeeded()
     }
 
     private static func loadHistory(from defaults: UserDefaults, key: String) -> [StateTransition] {
@@ -378,9 +401,8 @@ final class NetworkMonitor: ObservableObject {
         }
 
         healthSamples = updated
-        if let data = try? JSONEncoder().encode(updated) {
-            defaults.set(data, forKey: samplesKey)
-        }
+        pendingSamplesPersistence = true
+        schedulePersistenceFlushIfNeeded()
     }
 
     private static func loadSamples(from defaults: UserDefaults, key: String) -> [HealthSample] {
@@ -402,6 +424,67 @@ final class NetworkMonitor: ObservableObject {
 
     private static func isOutageState(_ state: ConnectivityState) -> Bool {
         state == .offline || state == .vpnIssue
+    }
+
+    private func schedulePersistenceFlushIfNeeded() {
+        guard persistenceFlushTask == nil else {
+            return
+        }
+
+        let now = Date()
+        let earliestFlush = now.addingTimeInterval(Limits.persistenceCoalesceSeconds)
+        let nextAllowedFlush = lastPersistenceFlushAt.map {
+            $0.addingTimeInterval(Limits.persistenceMinFlushIntervalSeconds)
+        } ?? earliestFlush
+        let flushDate = max(earliestFlush, nextAllowedFlush)
+        let delay = max(0, flushDate.timeIntervalSince(now))
+        let sleepNanos = UInt64((delay * 1_000_000_000).rounded())
+
+        persistenceFlushTask = Task { [weak self] in
+            if sleepNanos > 0 {
+                try? await Task.sleep(nanoseconds: sleepNanos)
+            }
+            self?.flushPendingPersistence(force: false)
+        }
+    }
+
+    private func flushPendingPersistence(force: Bool) {
+        persistenceFlushTask = nil
+        guard pendingHistoryPersistence || pendingSamplesPersistence else {
+            return
+        }
+
+        let now = Date()
+        if
+            !force,
+            let lastPersistenceFlushAt,
+            now.timeIntervalSince(lastPersistenceFlushAt) < Limits.persistenceMinFlushIntervalSeconds
+        {
+            schedulePersistenceFlushIfNeeded()
+            return
+        }
+
+        var wroteAny = false
+
+        if pendingHistoryPersistence, let data = try? JSONEncoder().encode(transitionHistory) {
+            defaults.set(data, forKey: historyKey)
+            pendingHistoryPersistence = false
+            wroteAny = true
+        }
+
+        if pendingSamplesPersistence, let data = try? JSONEncoder().encode(healthSamples) {
+            defaults.set(data, forKey: samplesKey)
+            pendingSamplesPersistence = false
+            wroteAny = true
+        }
+
+        if wroteAny {
+            lastPersistenceFlushAt = now
+        }
+
+        if !force, (pendingHistoryPersistence || pendingSamplesPersistence) {
+            schedulePersistenceFlushIfNeeded()
+        }
     }
 
     private func shouldSendNotification(at date: Date, settings: MonitorSettings) -> Bool {
