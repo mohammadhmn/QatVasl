@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject private var iranPulseMonitor: IranPulseMonitor
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var navigationStore: DashboardNavigationStore
+    @State private var showExternalRadarPanel = false
 
     private var settings: MonitorSettings {
         settingsStore.settings
@@ -35,6 +36,9 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showExternalRadarPanel) {
+            ExternalRadarPanel()
+        }
     }
 
     private var sidebar: some View {
@@ -369,8 +373,17 @@ struct ContentView: View {
         return VStack(alignment: .leading, spacing: 12) {
             GlassCard(cornerRadius: 18, tint: .orange.opacity(0.14)) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Current Iran Pulse")
-                        .font(.headline)
+                    HStack {
+                        Text("Current Iran Pulse")
+                            .font(.headline)
+                        Spacer()
+                        Button {
+                            showExternalRadarPanel = true
+                        } label: {
+                            Label("Open Radar Panel", systemImage: "safari")
+                        }
+                        .buttonStyle(.glass)
+                    }
 
                     HStack(spacing: 10) {
                         timelineMetric(
@@ -397,6 +410,10 @@ struct ContentView: View {
 
                     Text(pulse.summary)
                         .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("The Radar Panel opens Cloudflare/Arvan/Vanillapp sites in a native WKWebView for manual monitoring (no direct API integration).")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
