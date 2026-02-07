@@ -30,7 +30,7 @@ Core runtime components:
   - settings shortcut.
 - Route context detection:
   - system VPN-route detection,
-  - system proxy detection,
+  - configured proxy working detection (host/port + proxied probe success),
   - best-effort VPN client label (service/process based).
 - Connectivity probes:
   - domestic,
@@ -47,7 +47,7 @@ Core runtime components:
 - `IR ONLY`: domestic up, global down
 - `LIMITED`: global up, blocked target down
 - `VPN OK`: blocked target reachable through configured proxy
-- `VPN/PROXY`: system VPN/proxy active, direct-path verdict not authoritative
+- `VPN ACTIVE`: system VPN/TUN active, direct-path verdict not authoritative
 - `OPEN`: blocked target reachable directly
 
 ## Performance Work Completed

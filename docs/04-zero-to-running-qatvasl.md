@@ -117,7 +117,7 @@ Then:
 - `IR ONLY`: domestic route works only.
 - `LIMITED`: global works, blocked service fails.
 - `VPN OK`: blocked route works through proxy.
-- `VPN/PROXY`: system VPN/proxy active; direct verdict paused.
+- `VPN ACTIVE`: system VPN/TUN active; direct verdict paused.
 - `OPEN`: blocked service works directly.
 
 ## 9) Where Settings Are Stored

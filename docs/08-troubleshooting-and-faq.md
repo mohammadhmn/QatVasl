@@ -18,14 +18,14 @@ This is expected behavior.
 QatVasl intentionally switches to menu-bar-only mode when no app window is visible.  
 Use menu bar item → `Dashboard` to reopen window.
 
-## Q3) Route says `VPN/PROXY`. What does that mean?
+## Q3) Route says `VPN ACTIVE`. What does that mean?
 
-`VPN/PROXY` means system-level VPN/proxy overlay is active.  
+`VPN ACTIVE` means system-level VPN/TUN overlay is active.  
 Direct-path verdict is not authoritative in this mode because traffic is being routed through overlay.
 
 If you need true direct-path test:
 
-1. Temporarily disable VPN/system proxy.
+1. Temporarily disable VPN.
 2. Refresh QatVasl.
 
 ## Q4) VPN works in client, but app does not show `VPN OK`
@@ -94,7 +94,7 @@ just reset-settings
 
 Then relaunch app.
 
-## Q10) How to inspect tunnel/proxy state manually?
+## Q10) How to inspect VPN/proxy state manually?
 
 - Connected VPN services:
   - `scutil --nc list`

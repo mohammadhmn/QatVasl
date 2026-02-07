@@ -12,7 +12,11 @@ Primary source files:
 
 - `QatVasl/QatVaslApp.swift`
 - `QatVasl/NetworkMonitor.swift`
+- `QatVasl/RouteInspector.swift`
+- `QatVasl/ProbeEngine.swift`
+- `QatVasl/ConnectivityStateEvaluator.swift`
 - `QatVasl/NetworkModels.swift`
+- `QatVasl/ConnectivityState+UI.swift`
 - `QatVasl/SettingsStore.swift`
 - `QatVasl/ContentView.swift`
 - `QatVasl/MenuBarContentView.swift`
@@ -34,21 +38,21 @@ Responsibilities:
 
 If you need to change app lifecycle behavior, start here.
 
-## 3) Monitoring Engine
+## 3) Monitoring Runtime
 
-File: `QatVasl/NetworkMonitor.swift`
+Files:
+
+- `QatVasl/NetworkMonitor.swift`
+- `QatVasl/RouteInspector.swift`
+- `QatVasl/ProbeEngine.swift`
+- `QatVasl/ConnectivityStateEvaluator.swift`
 
 Responsibilities:
 
-- Runs periodic loop (`restartLoop`, `runCheck`).
-- Detects route context:
-  - VPN route active?
-  - system proxy active?
-  - likely VPN client name?
-- Runs four probes.
-- Evaluates final `ConnectivityState`.
-- Tracks transition history.
-- Sends notifications on degrade/recovery.
+- `NetworkMonitor` orchestrates scheduling, published UI state, transitions, and notifications.
+- `RouteInspector` performs off-main route detection with short-lived cache.
+- `ProbeEngine` owns URL sessions and executes all network probes.
+- `ConnectivityStateEvaluator` maps probe snapshot + route context to `ConnectivityState`.
 
 ### Data published to UI
 
@@ -59,8 +63,8 @@ Responsibilities:
 - `lastCheckedAt`
 - `isChecking`
 - `transitionHistory`
-- `tunnelDetected`
-- `systemProxyDetected`
+- `vpnDetected`
+- `proxyDetected` (configured proxy host/port is connectable and proxied probe succeeds)
 - `vpnClientLabel`
 
 ### Performance-sensitive sections
@@ -69,7 +73,7 @@ Responsibilities:
 - Network sessions are reused.
 - Settings-triggered restarts are debounced.
 
-## 4) Domain Models
+## 4) Domain Models and UI State Styling
 
 File: `QatVasl/NetworkModels.swift`
 
@@ -78,12 +82,17 @@ Contains:
 - `ConnectivityState`
 - `MonitorSettings`
 - `ProxyType`
+- `ProbeKind`
 - `ProbeResult`
 - `ProbeSnapshot`
 - `StateTransition`
 - `SettingsPreset`
 
-This file is your first stop for changing:
+File: `QatVasl/ConnectivityState+UI.swift`
+
+Contains UI-facing color mapping for `ConnectivityState` so dashboards/menu bar share one style source.
+
+`NetworkModels.swift` is your first stop for changing:
 
 - status names,
 - default URLs,
@@ -147,10 +156,10 @@ Contains reusable components:
 
 ## 7) State Evaluation Logic (Operationally Important)
 
-In `NetworkMonitor.evaluate(...)`:
+In `ConnectivityStateEvaluator.evaluate(...)`:
 
-1. If VPN/proxy overlay is active:
-   - any reachable probe => `VPN/PROXY`
+1. If VPN TUN overlay is active:
+   - any reachable probe => `VPN ACTIVE`
    - else => `OFFLINE`
 2. If no overlay:
    - blocked direct reachable => `OPEN`
@@ -167,7 +176,7 @@ Example: add a new probe target.
 
 1. Add model field in `MonitorSettings` and defaults.
 2. Add UI field in `SettingsView`.
-3. Add probe call in `NetworkMonitor.runCheck`.
+3. Add probe call in `ProbeEngine.runSnapshot(...)`.
 4. Extend `ProbeSnapshot` and UI rendering.
 5. Rebuild and validate.
 

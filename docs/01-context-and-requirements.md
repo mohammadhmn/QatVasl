@@ -21,7 +21,8 @@ Build a native macOS menu-bar app that continuously answers:
 1. Is direct internet usable now?
 2. Is blocked traffic reachable through VPN/proxy now?
 3. Did connectivity degrade or recover compared to last cycle?
-4. Is system-level tunneling/proxy currently active, making direct-path verdict ambiguous?
+4. Is system-level VPN/TUN active, making direct-path verdict ambiguous?
+5. Is the configured local proxy endpoint (host/port) actually working?
 
 ## Functional Requirements
 
@@ -33,8 +34,8 @@ Build a native macOS menu-bar app that continuously answers:
 - Must send notifications on state transitions.
 - Must show route context:
   - direct path,
-  - system proxy active,
   - VPN route active,
+  - configured proxy working,
   - detected VPN client label (best effort).
 
 ## UX Requirements

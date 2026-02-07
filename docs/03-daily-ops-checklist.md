@@ -28,8 +28,8 @@ Reduce decision fatigue and wasted time during unstable connectivity periods by 
   - Action: global web is up but blocked route is down; rotate VPN route/profile.
 - `VPN OK`:
   - Action: continue work, monitor for drops.
-- `VPN/PROXY`:
-  - Action: route overlay is active; direct-path verdict is paused. Disable overlay only if you need true direct-path verification.
+- `VPN ACTIVE`:
+  - Action: VPN/TUN overlay is active; direct-path verdict is paused. Disable VPN if you need true direct-path verification.
 - `OPEN`:
   - Action: direct blocked target is reachable now; VPN may be optional.
 

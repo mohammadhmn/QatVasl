@@ -29,7 +29,7 @@ Connectivity states:
 - `IR` / `IR ONLY`: domestic works, global fails
 - `LMT` / `LIMITED`: global works, blocked target fails
 - `VPN` / `VPN OK`: blocked target works through proxy
-- `VPN` / `VPN/PROXY`: system VPN/proxy overlay is active (direct-path verdict paused)
+- `VPN` / `VPN ACTIVE`: system VPN/TUN route is active (direct-path verdict paused)
 - `OPEN`: blocked target works without proxy
 
 ## Documentation Map
