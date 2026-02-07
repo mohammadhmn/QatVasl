@@ -48,43 +48,37 @@ final class SettingsStore: ObservableObject {
     func resetToDefaults() {
         var reset = MonitorSettings.defaults
         reset.launchAtLogin = LoginItemManager.isEnabled
-        reset.syncActiveProfileFromCurrentValues()
-        settings = reset
+        commitSettings(reset)
     }
 
     func applyPreset(_ preset: SettingsPreset) {
-        var updated = settings
-        updated.applyPreset(preset)
-        updated.syncActiveProfileFromCurrentValues()
-        settings = updated
+        mutateSettings { updated in
+            updated.applyPreset(preset)
+        }
     }
 
     func selectISPProfile(_ id: String) {
-        var updated = settings
-        updated.selectProfile(id: id)
-        updated.syncActiveProfileFromCurrentValues()
-        settings = updated
+        mutateSettings { updated in
+            updated.selectProfile(id: id)
+        }
     }
 
     func addISPProfile(named name: String? = nil) {
-        var updated = settings
-        updated.addProfile(named: name ?? "New ISP")
-        updated.syncActiveProfileFromCurrentValues()
-        settings = updated
+        mutateSettings { updated in
+            updated.addProfile(named: name ?? "New ISP")
+        }
     }
 
     func removeISPProfile(_ id: String) {
-        var updated = settings
-        updated.removeProfile(id: id)
-        updated.syncActiveProfileFromCurrentValues()
-        settings = updated
+        mutateSettings { updated in
+            updated.removeProfile(id: id)
+        }
     }
 
     func renameISPProfile(_ id: String, to name: String) {
-        var updated = settings
-        updated.renameProfile(id: id, name: name)
-        updated.syncActiveProfileFromCurrentValues()
-        settings = updated
+        mutateSettings { updated in
+            updated.renameProfile(id: id, name: name)
+        }
     }
 
     func detectAndRenameActiveISPProfile() async {
@@ -115,63 +109,82 @@ final class SettingsStore: ObservableObject {
         checkDirect: Bool? = nil,
         checkProxy: Bool? = nil
     ) {
-        var updated = settings
-        guard let index = updated.criticalServices.firstIndex(where: { $0.id == id }) else {
+        guard settings.criticalServices.contains(where: { $0.id == id }) else {
             return
         }
 
-        if let name {
-            updated.criticalServices[index].name = name
+        mutateSettings { updated in
+            guard let index = updated.criticalServices.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+
+            if let name {
+                updated.criticalServices[index].name = name
+            }
+            if let url {
+                updated.criticalServices[index].url = url
+            }
+            if let enabled {
+                updated.criticalServices[index].enabled = enabled
+            }
+            if let checkDirect {
+                updated.criticalServices[index].checkDirect = checkDirect
+            }
+            if let checkProxy {
+                updated.criticalServices[index].checkProxy = checkProxy
+            }
+            updated.sanitizeCriticalServices()
         }
-        if let url {
-            updated.criticalServices[index].url = url
-        }
-        if let enabled {
-            updated.criticalServices[index].enabled = enabled
-        }
-        if let checkDirect {
-            updated.criticalServices[index].checkDirect = checkDirect
-        }
-        if let checkProxy {
-            updated.criticalServices[index].checkProxy = checkProxy
-        }
-        updated.sanitizeCriticalServices()
-        settings = updated
     }
 
     func addCriticalService() {
-        var updated = settings
-        updated.criticalServices.append(
-            CriticalServiceConfig(name: "New Service", url: "https://")
-        )
-        updated.sanitizeCriticalServices()
-        settings = updated
+        mutateSettings { updated in
+            updated.criticalServices.append(
+                CriticalServiceConfig(name: "New Service", url: "https://")
+            )
+            updated.sanitizeCriticalServices()
+        }
     }
 
     func removeCriticalService(id: String) {
-        var updated = settings
-        updated.criticalServices.removeAll { $0.id == id }
-        updated.sanitizeCriticalServices()
-        settings = updated
+        mutateSettings { updated in
+            updated.criticalServices.removeAll { $0.id == id }
+            updated.sanitizeCriticalServices()
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             try LoginItemManager.setEnabled(enabled)
             launchAtLoginError = nil
-
-            var updated = settings
-            updated.launchAtLogin = enabled
-            updated.syncActiveProfileFromCurrentValues()
-            settings = updated
+            mutateSettings { updated in
+                updated.launchAtLogin = enabled
+            }
         } catch {
             launchAtLoginError = error.localizedDescription
-
-            var updated = settings
-            updated.launchAtLogin = LoginItemManager.isEnabled
-            updated.syncActiveProfileFromCurrentValues()
-            settings = updated
+            mutateSettings { updated in
+                updated.launchAtLogin = LoginItemManager.isEnabled
+            }
         }
+    }
+
+    func update(_ mutation: (inout MonitorSettings) -> Void) {
+        mutateSettings(mutation)
+    }
+
+    private func mutateSettings(_ mutation: (inout MonitorSettings) -> Void) {
+        var updated = settings
+        mutation(&updated)
+        commitSettings(updated)
+    }
+
+    private func commitSettings(_ newSettings: MonitorSettings) {
+        var synced = newSettings
+        synced.syncActiveProfileFromCurrentValues()
+        guard synced != settings else {
+            return
+        }
+        settings = synced
     }
 
     private func persist(_ settings: MonitorSettings) {

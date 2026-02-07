@@ -4,6 +4,18 @@ import UserNotifications
 
 @MainActor
 final class NetworkMonitor: ObservableObject {
+    private struct StateChange {
+        let previous: ConnectivityState
+        let current: ConnectivityState
+        let timestamp: Date
+    }
+
+    private enum Limits {
+        static let transitionHistory = 40
+        static let healthSampleHistory = 2_000
+        static let healthSampleRetentionSeconds: TimeInterval = 7 * 24 * 60 * 60
+    }
+
     @Published private(set) var currentState: ConnectivityState
     @Published private(set) var diagnosis: ConnectivityDiagnosis
     @Published private(set) var routeIndicators: [RouteIndicator]
@@ -60,14 +72,14 @@ final class NetworkMonitor: ObservableObject {
             return .empty
         }
 
-        let uptimeCount = recent.filter { $0.state != .offline && $0.state != .vpnIssue }.count
+        let uptimeCount = recent.filter { !Self.isOutageState($0.state) }.count
         let uptimePercent = Int((Double(uptimeCount) / Double(recent.count) * 100).rounded())
         let averageLatencyValues = recent.compactMap(\.averageLatencyMs)
         let averageLatencyMs = averageLatencyValues.isEmpty
             ? nil
             : Int((Double(averageLatencyValues.reduce(0, +)) / Double(averageLatencyValues.count)).rounded())
         let dropCount = transitionHistory.filter {
-            $0.timestamp >= Date().addingTimeInterval(-24 * 60 * 60) && ($0.to == .offline || $0.to == .vpnIssue)
+            $0.timestamp >= Date().addingTimeInterval(-24 * 60 * 60) && Self.isOutageState($0.to)
         }.count
 
         let orderedSamples = recent.sorted { $0.timestamp < $1.timestamp }
@@ -75,7 +87,7 @@ final class NetworkMonitor: ObservableObject {
         var recoveries: [TimeInterval] = []
 
         for sample in orderedSamples {
-            if sample.state == .offline || sample.state == .vpnIssue {
+            if Self.isOutageState(sample.state) {
                 if outageStart == nil {
                     outageStart = sample.timestamp
                 }
@@ -178,7 +190,7 @@ final class NetworkMonitor: ObservableObject {
     }
 
     private func runCheck() async {
-        if isChecking {
+        guard !isChecking else {
             return
         }
         isChecking = true
@@ -188,10 +200,7 @@ final class NetworkMonitor: ObservableObject {
         let routeContext = await routeInspector.inspect()
         let snapshot = await probeEngine.runSnapshot(settings: settings)
         let timestamp = Date()
-        if shouldRefreshCriticalServices(now: timestamp, interval: settings.normalizedInterval) {
-            criticalServiceResults = await probeEngine.runCriticalServices(settings: settings)
-            lastCriticalServicesCheckAt = timestamp
-        }
+        await refreshCriticalServicesIfNeeded(settings: settings, timestamp: timestamp)
         let proxyEndpointConnected = await probeEngine.isProxyEndpointConnected(settings: settings)
         let proxyIsWorking = apply(
             routeContext: routeContext,
@@ -206,24 +215,39 @@ final class NetworkMonitor: ObservableObject {
             proxyActive: proxyIsWorking,
             proxyEndpointConnected: proxyEndpointConnected
         )
-        let previousState = currentState
-        let nextState = assessment.state
+        let stateChange = applyAssessment(assessment, snapshot: snapshot)
 
-        currentState = nextState
+        if hasCompletedFirstCheck, stateChange.previous != stateChange.current {
+            appendTransition(from: stateChange.previous, to: stateChange.current, at: stateChange.timestamp)
+        }
+
+        await maybeNotifyTransition(from: stateChange.previous, to: stateChange.current, settings: settings)
+    }
+
+    private func refreshCriticalServicesIfNeeded(settings: MonitorSettings, timestamp: Date) async {
+        guard shouldRefreshCriticalServices(now: timestamp, interval: settings.normalizedInterval) else {
+            return
+        }
+
+        criticalServiceResults = await probeEngine.runCriticalServices(settings: settings)
+        lastCriticalServicesCheckAt = timestamp
+    }
+
+    private func applyAssessment(_ assessment: ConnectivityAssessment, snapshot: ProbeSnapshot) -> StateChange {
+        let previous = currentState
+        let next = assessment.state
+
+        currentState = next
         diagnosis = assessment.diagnosis
         routeIndicators = assessment.routeIndicators
-        defaults.set(nextState.rawValue, forKey: stateKey)
+        defaults.set(next.rawValue, forKey: stateKey)
 
         lastSnapshot = snapshot
         lastCheckedAt = snapshot.timestamp
         latestError = snapshot.allResults.first(where: { !$0.ok })?.error
-        appendHealthSample(state: nextState, snapshot: snapshot, timestamp: snapshot.timestamp)
+        appendHealthSample(state: next, snapshot: snapshot, timestamp: snapshot.timestamp)
 
-        if hasCompletedFirstCheck, previousState != nextState {
-            appendTransition(from: previousState, to: nextState, at: snapshot.timestamp)
-        }
-
-        await maybeNotifyTransition(from: previousState, to: nextState, settings: settings)
+        return StateChange(previous: previous, current: next, timestamp: snapshot.timestamp)
     }
 
     private func apply(
@@ -308,8 +332,8 @@ final class NetworkMonitor: ObservableObject {
     private func appendTransition(from: ConnectivityState, to: ConnectivityState, at timestamp: Date) {
         var updated = transitionHistory
         updated.insert(StateTransition(from: from, to: to, timestamp: timestamp), at: 0)
-        if updated.count > 40 {
-            updated.removeLast(updated.count - 40)
+        if updated.count > Limits.transitionHistory {
+            updated.removeLast(updated.count - Limits.transitionHistory)
         }
         transitionHistory = updated
 
@@ -347,10 +371,10 @@ final class NetworkMonitor: ObservableObject {
             at: 0
         )
 
-        let cutoff = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        let cutoff = Date().addingTimeInterval(-Limits.healthSampleRetentionSeconds)
         updated.removeAll { $0.timestamp < cutoff }
-        if updated.count > 2_000 {
-            updated.removeLast(updated.count - 2_000)
+        if updated.count > Limits.healthSampleHistory {
+            updated.removeLast(updated.count - Limits.healthSampleHistory)
         }
 
         healthSamples = updated
@@ -374,6 +398,10 @@ final class NetworkMonitor: ObservableObject {
             return .checking
         }
         return ConnectivityState(rawValue: rawState) ?? .checking
+    }
+
+    private static func isOutageState(_ state: ConnectivityState) -> Bool {
+        state == .offline || state == .vpnIssue
     }
 
     private func shouldSendNotification(at date: Date, settings: MonitorSettings) -> Bool {
