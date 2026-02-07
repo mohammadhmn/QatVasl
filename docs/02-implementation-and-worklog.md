@@ -18,37 +18,48 @@ Core runtime components:
 - `MenuBarContentView.swift`: menu bar popover UI.
 - `SettingsView.swift`: settings UI.
 - `DashboardComponents.swift`: reusable UI building blocks.
-- `QatVasl/justfile`: build/run/package automation commands.
+- `justfile`: build/run/package automation commands.
 
 ## Feature Set Implemented
 
-- Menu bar status with compact label (`OFF`, `IR`, `LMT`, `VPN`, `OPEN`) and colored dot.
+- Menu bar status with compact label (`CHK`, `OFF`, `DEG`, `OK`) and status icon.
 - Dashboard with:
   - overview,
   - probes,
-  - transition timeline,
+  - services matrix,
+  - timeline,
   - settings shortcut.
 - Route context detection:
-  - system VPN-route detection,
-  - configured proxy working detection (host/port + proxied probe success),
+  - system VPN-route detection (TUN/system overlay evidence),
+  - configured proxy route detection (host/port reachable + proxied blocked-service check),
   - best-effort VPN client label (service/process based).
 - Connectivity probes:
   - domestic,
   - global,
-  - blocked direct,
-  - blocked via proxy.
-- Notifications on connectivity transitions.
+  - restricted service (direct),
+  - restricted service (proxy).
+- Plain-language diagnosis + recommended actions per state.
+- Critical services matrix (direct/proxy checks per configured service).
+- Timeline metrics over recent history (24h summary view).
+- ISP profiles (save/apply/remove).
+- Notifications with cooldown + quiet hours.
+- Diagnostics report export from dashboard.
 - Launch-at-login toggle.
 - Close dashboard with `⌘W` while app stays in menu bar.
 
 ## Connectivity State Model
 
-- `OFFLINE`: no reliable connectivity
-- `IR ONLY`: domestic up, global down
-- `LIMITED`: global up, blocked target down
-- `VPN OK`: blocked target reachable through configured proxy
-- `VPN ACTIVE`: system VPN/TUN active, direct-path verdict not authoritative
-- `OPEN`: blocked target reachable directly
+- `CHECKING`: monitor loop is running probes.
+- `OFFLINE`: no usable route detected.
+- `DEGRADED`: partial connectivity only.
+- `USABLE`: route is currently usable.
+
+Route labels:
+
+- `DIRECT`
+- `VPN`
+- `PROXY`
+- `VPN + PROXY`
 
 ## Performance Work Completed
 
@@ -65,6 +76,7 @@ Recent optimizations to improve responsiveness:
 - Improved menu bar readability with compact status label and dot.
 - Sidebar-based dashboard layout.
 - Settings button behavior fixed and wired.
+- Export diagnostics action in dashboard.
 - App activation policy management:
   - dashboard visible => Dock app visible,
   - dashboard closed => menu-bar-only behavior.
@@ -83,10 +95,8 @@ Recent optimizations to improve responsiveness:
 - `logs`
 - `reset-settings`
 
-## Suggested Next Iterations
+## Remaining Work (Shortlist)
 
-- Per-ISP profile presets and quick switcher.
-- Persistent route-quality trend charts.
-- Optional repeated alerts for prolonged degraded states.
-- Export/import settings profiles.
-- Optional richer diagnostics panel (active interfaces, recent failures, proxy latency trend).
+- Add automated tests for state evaluation and route classification.
+- Add optional repeated reminders for prolonged outage windows.
+- Add import/export for full settings + profile bundles.

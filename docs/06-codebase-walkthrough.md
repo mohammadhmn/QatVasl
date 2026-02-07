@@ -63,9 +63,13 @@ Responsibilities:
 - `lastCheckedAt`
 - `isChecking`
 - `transitionHistory`
+- `healthSamples`
+- `diagnosis`
+- `routeIndicators`
 - `vpnDetected`
 - `proxyDetected` (configured proxy host/port is connectable and proxied probe succeeds)
 - `vpnClientLabel`
+- `criticalServiceResults`
 
 ### Performance-sensitive sections
 
@@ -82,15 +86,18 @@ Contains:
 - `ConnectivityState`
 - `MonitorSettings`
 - `ProxyType`
+- `ISPProfile`
+- `CriticalServiceConfig`
 - `ProbeKind`
 - `ProbeResult`
 - `ProbeSnapshot`
 - `StateTransition`
+- `HealthSample`
 - `SettingsPreset`
 
 File: `QatVasl/ConnectivityState+UI.swift`
 
-Contains UI-facing color mapping for `ConnectivityState` so dashboards/menu bar share one style source.
+Contains UI-facing color mapping for `ConnectivityState` so dashboard/menu bar share one style source.
 
 `NetworkModels.swift` is your first stop for changing:
 
@@ -98,6 +105,8 @@ Contains UI-facing color mapping for `ConnectivityState` so dashboards/menu bar 
 - default URLs,
 - default interval/timeout,
 - proxy defaults,
+- ISP profile defaults,
+- critical service defaults,
 - state detail text and suggested actions.
 
 ## 5) Persistence and Settings Logic
@@ -120,11 +129,12 @@ File: `QatVasl/ContentView.swift`
 
 Contains:
 
-- Sidebar navigation.
+- Sidebar navigation (Overview/Probes/Services/Timeline/Settings).
 - Hero status area.
+- Diagnosis section with action list.
 - Probe cards.
-- Transition timeline.
-- Settings shortcuts.
+- Services matrix and timeline views.
+- Diagnostics export and quick actions.
 
 ### Menu bar popover UI
 
@@ -141,7 +151,7 @@ Contains compact operational panel:
 
 File: `QatVasl/SettingsView.swift`
 
-Contains editable controls for monitor and proxy behavior.
+Contains editable controls for monitor/proxy behavior, ISP profiles, critical services, and notifications.
 
 ### Shared visual components
 
@@ -159,13 +169,14 @@ Contains reusable components:
 In `ConnectivityStateEvaluator.evaluate(...)`:
 
 1. If VPN TUN overlay is active:
-   - any reachable probe => `VPN ACTIVE`
+   - if any meaningful path works => `USABLE`
    - else => `OFFLINE`
-2. If no overlay:
-   - blocked direct reachable => `OPEN`
-   - else blocked via proxy reachable => `VPN OK`
-   - else domestic yes + global no => `IR ONLY`
-   - else global yes => `LIMITED`
+2. If no VPN overlay:
+   - blocked-service direct reachable => `USABLE`
+   - else blocked-service proxy reachable => `USABLE`
+   - else domestic + global reachable => `DEGRADED`
+   - else domestic only => `DEGRADED`
+   - else proxy port reachable but blocked-service proxy fails => `DEGRADED`
    - else => `OFFLINE`
 
 This ordering defines how QatVasl interprets network reality.
@@ -190,6 +201,10 @@ Example: add a new probe target.
   - `QatVasl/NetworkMonitor.swift`
 - Change menu bar UI text:
   - `QatVasl/MenuBarContentView.swift`
+- Change diagnosis actions:
+  - `QatVasl/ConnectivityStateEvaluator.swift`
+- Change services defaults:
+  - `QatVasl/NetworkModels.swift`
 
 ## 10) Recommended Reading Sequence for New Contributors
 

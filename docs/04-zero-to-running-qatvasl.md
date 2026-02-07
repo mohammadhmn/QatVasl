@@ -36,7 +36,7 @@ open QatVasl.xcodeproj
 What should happen:
 
 - App launches.
-- A new menu bar item appears (status dot + short label like `OFF`, `VPN`, `OPEN`).
+- A new menu bar item appears (status icon + short label like `CHK`, `OFF`, `DEG`, `OK`).
 - Dashboard window opens.
 
 ## 4) Daily Run (Terminal Way)
@@ -61,7 +61,7 @@ Click menu bar item to open quick panel:
 
 - Current state summary
 - Probe results
-- Route mode (`Direct path`, `VPN active`, `PROXY active`, etc.)
+- Route mode (`DIRECT`, `VPN`, `PROXY`, `VPN + PROXY`)
 - Detected VPN client label (best effort)
 - Buttons: `Refresh`, `Settings`, `Dashboard`
 
@@ -71,6 +71,7 @@ Sidebar sections:
 
 - Overview
 - Probes
+- Services
 - Timeline
 - Settings
 
@@ -83,7 +84,11 @@ Configure:
 - Interval and timeout
 - Probe target URLs
 - Proxy host/port/type
+- ISP profiles
+- Critical services list
 - Notifications
+  - cooldown
+  - quiet hours
 - Launch at login
 
 ## 6) Important Behavior (Not a Bug)
@@ -109,18 +114,26 @@ Then:
 
 1. Connect VPN.
 2. Press `Refresh`.
-3. Check if state becomes `VPN OK`.
+3. Check if state becomes `USABLE`.
 
 ## 8) Understanding Status Quickly
 
-- `OFFLINE`: nothing useful works.
-- `IR ONLY`: domestic route works only.
-- `LIMITED`: global works, blocked service fails.
-- `VPN OK`: blocked route works through proxy.
-- `VPN ACTIVE`: system VPN/TUN active; direct verdict paused.
-- `OPEN`: blocked service works directly.
+- `CHECKING`: running probes now.
+- `OFFLINE`: no reliable route.
+- `DEGRADED`: partial connectivity only.
+- `USABLE`: internet is currently usable.
 
-## 9) Where Settings Are Stored
+Use route indicators (`DIRECT`, `VPN`, `PROXY`) and diagnosis text to understand exactly which path works.
+
+## 9) Diagnostics Export
+
+From dashboard overview:
+
+1. Click `Export report`.
+2. Save generated `.txt` file.
+3. Share/report it for troubleshooting.
+
+## 10) Where Settings Are Stored
 
 QatVasl stores settings in macOS user defaults.
 
@@ -130,7 +143,7 @@ Reset settings:
 just reset-settings
 ```
 
-## 10) Next Steps
+## 11) Next Steps
 
 If you now want to understand code:
 

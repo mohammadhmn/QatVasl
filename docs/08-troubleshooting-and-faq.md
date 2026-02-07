@@ -18,9 +18,9 @@ This is expected behavior.
 QatVasl intentionally switches to menu-bar-only mode when no app window is visible.  
 Use menu bar item → `Dashboard` to reopen window.
 
-## Q3) Route says `VPN ACTIVE`. What does that mean?
+## Q3) Route shows `VPN`. What does that mean?
 
-`VPN ACTIVE` means system-level VPN/TUN overlay is active.  
+`VPN` means system-level VPN/TUN overlay is active.  
 Direct-path verdict is not authoritative in this mode because traffic is being routed through overlay.
 
 If you need true direct-path test:
@@ -28,7 +28,7 @@ If you need true direct-path test:
 1. Temporarily disable VPN.
 2. Refresh QatVasl.
 
-## Q4) VPN works in client, but app does not show `VPN OK`
+## Q4) VPN/proxy works in client, but app is not `USABLE`
 
 Check in this order:
 
@@ -59,6 +59,7 @@ So yes, it can be unknown or occasionally imperfect.
 1. In QatVasl settings, enable notifications.
 2. In macOS System Settings, allow notifications for QatVasl.
 3. Trigger transition (for example by changing network state) and verify.
+4. Check notification cooldown and quiet hours settings.
 
 ## Q7) App feels slow or laggy
 
@@ -75,7 +76,16 @@ If still laggy:
 2. Increase timeout if network is very unstable.
 3. Avoid unnecessary rapid settings edits.
 
-## Q8) Build fails after changes
+## Q8) App says `PROXY` but traffic still fails
+
+`PROXY` becomes active only when:
+
+1. configured proxy port is reachable, and
+2. restricted-service probe through proxy succeeds.
+
+If your external app still fails, compare against `Services` tab per-service matrix and rotate node/profile.
+
+## Q9) Build fails after changes
 
 Do this sequence:
 
@@ -86,7 +96,7 @@ just build-debug
 
 Then inspect first compiler error (not last).
 
-## Q9) I want to fully reset app state
+## Q10) I want to fully reset app state
 
 ```bash
 just reset-settings
@@ -94,7 +104,7 @@ just reset-settings
 
 Then relaunch app.
 
-## Q10) How to inspect VPN/proxy state manually?
+## Q11) How to inspect VPN/proxy state manually?
 
 - Connected VPN services:
   - `scutil --nc list`
@@ -103,7 +113,15 @@ Then relaunch app.
 - Known VPN processes:
   - `ps -axo comm | egrep -i 'happ|openvpn|wireguard|v2ray|xray|sing-box|clash'`
 
-## Q11) How should I operate daily in unstable conditions?
+## Q12) How do I export diagnostics for support/debug?
+
+From dashboard:
+
+1. Open `Overview`.
+2. Click `Export report`.
+3. Share saved report text with timestamp + route + probe snapshot.
+
+## Q13) How should I operate daily in unstable conditions?
 
 Use:
 

@@ -4,7 +4,7 @@ QatVasl is a native macOS menu-bar app for monitoring unstable/restricted intern
 
 It is designed for environments where you constantly switch ISP and VPN configs and need quick, reliable status without manual checks.
 
-## Quick Start (Native App)
+## Quick Start
 
 1. Open the project in Xcode:
    - `QatVasl.xcodeproj`
@@ -16,21 +16,36 @@ It is designed for environments where you constantly switch ISP and VPN configs 
 After launch, QatVasl appears in the menu bar.  
 Closing dashboard window (`⌘W`) keeps QatVasl alive in menu bar and removes it from Dock.
 
-## What QatVasl Monitors
+## Probe Set
 
 Each cycle it probes:
 - Domestic reachability (default: `https://www.aparat.com/`)
 - Global reachability (default: `https://www.google.com/generate_204`)
-- Blocked target directly (default: `https://web.telegram.org/`)
-- Blocked target through your local proxy/VPN endpoint (default: `127.0.0.1:10808`, SOCKS5)
+- Restricted service via direct path (default: `https://web.telegram.org/`)
+- Restricted service via configured proxy endpoint (default: `127.0.0.1:10808`, SOCKS5)
 
-Connectivity states:
-- `OFF` / `OFFLINE`: no reliable route
-- `IR` / `IR ONLY`: domestic works, global fails
-- `LMT` / `LIMITED`: global works, blocked target fails
-- `VPN` / `VPN OK`: blocked target works through proxy
-- `VPN` / `VPN ACTIVE`: system VPN/TUN route is active (direct-path verdict paused)
-- `OPEN`: blocked target works without proxy
+## Status and Route Model
+
+Top-level status:
+- `CHECKING`: a probe cycle is in progress.
+- `USABLE`: internet is currently usable for your configured workflow.
+- `DEGRADED`: some routes/services work, but not enough for normal use.
+- `OFFLINE`: no reliable route detected.
+
+Route indicators:
+- `DIRECT`: no system VPN route and no working proxy route.
+- `VPN`: system TUN/VPN overlay route is active.
+- `PROXY`: configured proxy endpoint is active and proxied probe succeeds.
+- `VPN + PROXY`: both VPN and proxy route are active.
+
+## Core Features
+
+- Plain-language diagnosis with recommended actions.
+- Critical services matrix (direct vs proxy per service).
+- 24h timeline metrics (uptime, drops, latency, recovery).
+- ISP profiles for quick switching.
+- Notification cooldown + quiet hours.
+- Diagnostics export (`Export report`) for support/debug sharing.
 
 ## Documentation Map
 
@@ -48,3 +63,10 @@ Beginner track (recommended for first-time Swift/macOS developers):
 - `docs/06-codebase-walkthrough.md`
 - `docs/07-build-run-package-playbook.md`
 - `docs/08-troubleshooting-and-faq.md`
+
+## Common Commands
+
+- `just dev`
+- `just build-debug`
+- `just build-release`
+- `just dmg`
