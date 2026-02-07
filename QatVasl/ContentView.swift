@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 private enum DashboardSidebarItem: String, CaseIterable, Identifiable {
     case overview
@@ -339,6 +340,13 @@ struct ContentView: View {
                     .buttonStyle(.glass)
 
                     Button {
+                        exportDiagnosticsReport()
+                    } label: {
+                        Label("Export report", systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.glass)
+
+                    Button {
                         presentSettings()
                     } label: {
                         Label("Open settings", systemImage: "gearshape.fill")
@@ -632,6 +640,20 @@ struct ContentView: View {
 
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(payload, forType: .string)
+    }
+
+    private func exportDiagnosticsReport() {
+        let report = monitor.diagnosticsReport(settings: settingsStore.settings)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "qatvasl-diagnostics-\(Int(Date().timeIntervalSince1970)).txt"
+        panel.allowedContentTypes = [.plainText]
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        try? report.write(to: url, atomically: true, encoding: .utf8)
     }
 
     @ViewBuilder

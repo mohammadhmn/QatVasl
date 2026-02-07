@@ -417,4 +417,84 @@ final class NetworkMonitor: ObservableObject {
         let refreshInterval = max(30, min(300, interval * 2))
         return now.timeIntervalSince(lastCriticalServicesCheckAt) >= refreshInterval
     }
+
+    func diagnosticsReport(settings: MonitorSettings) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+
+        let lastSnapshotSummary: String
+        if let lastSnapshot {
+            lastSnapshotSummary = lastSnapshot.allResults
+                .map { "\($0.name): \($0.summary) (\($0.target))" }
+                .joined(separator: "\n")
+        } else {
+            lastSnapshotSummary = "No snapshot yet."
+        }
+
+        let servicesSummary: String
+        if criticalServiceResults.isEmpty {
+            servicesSummary = "No critical service checks yet."
+        } else {
+            servicesSummary = criticalServiceResults.map { service in
+                let direct = service.direct?.summary ?? "—"
+                let proxy = service.proxy?.summary ?? "—"
+                return "\(service.name)\n  DIRECT: \(direct)\n  PROXY: \(proxy)"
+            }.joined(separator: "\n")
+        }
+
+        let transitionsSummary: String
+        if transitionHistory.isEmpty {
+            transitionsSummary = "No recorded transitions."
+        } else {
+            transitionsSummary = transitionHistory.prefix(20).map { transition in
+                "\(transition.label) at \(formatter.string(from: transition.timestamp))"
+            }.joined(separator: "\n")
+        }
+
+        let timeline = timelineSummary24h
+
+        return """
+        QatVasl Diagnostics
+        Generated: \(formatter.string(from: Date()))
+
+        Status
+        - State: \(displayState.shortLabel)
+        - Detail: \(displayState.detail)
+        - Route: \(routeModeLabel)
+        - VPN client: \(vpnClientLabel ?? "Unknown")
+        - Last check: \(lastCheckedAt.map { formatter.string(from: $0) } ?? "N/A")
+        - Latest error: \(latestError ?? "N/A")
+
+        Diagnosis
+        - \(diagnosis.title)
+        - \(diagnosis.explanation)
+        - Actions:
+        \(diagnosis.actions.enumerated().map { "  \($0.offset + 1). \($0.element)" }.joined(separator: "\n"))
+
+        Timeline (24h)
+        - Uptime: \(timeline.uptimePercent)%
+        - Drops: \(timeline.dropCount)
+        - Avg latency: \(timeline.averageLatencyMs.map { "\($0) ms" } ?? "N/A")
+        - Mean recovery: \(timeline.meanRecoverySeconds.map { "\($0) s" } ?? "N/A")
+        - Samples: \(timeline.sampleCount)
+
+        Probe Snapshot
+        \(lastSnapshotSummary)
+
+        Critical Services
+        \(servicesSummary)
+
+        Recent Transitions
+        \(transitionsSummary)
+
+        Settings
+        - Active ISP profile: \(settings.activeProfile?.name ?? "N/A")
+        - Interval: \(Int(settings.intervalSeconds)) sec
+        - Timeout: \(Int(settings.timeoutSeconds)) sec
+        - Proxy: \(settings.proxyType.title) \(settings.proxyHost):\(settings.proxyPort) [enabled=\(settings.proxyEnabled)]
+        - Notifications: enabled=\(settings.notificationsEnabled), recovery=\(settings.notifyOnRecovery), cooldown=\(Int(settings.notificationCooldownMinutes)) min
+        - Quiet hours: enabled=\(settings.quietHoursEnabled), from=\(settings.quietHoursStart):00 to \(settings.quietHoursEnd):00
+        """
+    }
 }
