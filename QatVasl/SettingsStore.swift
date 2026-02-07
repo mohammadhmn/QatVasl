@@ -98,7 +98,7 @@ final class SettingsStore: ObservableObject {
         isDetectingISP = true
         defer { isDetectingISP = false }
 
-        let routeContext = await routeInspector.inspect()
+        let routeContext = await routeInspector.inspect(cacheTTL: 8, forceRefresh: true)
         if routeContext.vpnActive {
             let clientName = routeContext.vpnClientName ?? "Unknown VPN"
             detectedISPMessage = "VPN is active (\(clientName)). Disconnect VPN to detect direct ISP."

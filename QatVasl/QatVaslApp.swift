@@ -56,9 +56,10 @@ struct QatVaslApp: App {
     @StateObject private var navigationStore = DashboardNavigationStore()
 
     init() {
-        let store = SettingsStore()
+        let sharedRouteInspector = RouteInspector()
+        let store = SettingsStore(routeInspector: sharedRouteInspector)
         _settingsStore = StateObject(wrappedValue: store)
-        _monitor = StateObject(wrappedValue: NetworkMonitor(settingsStore: store))
+        _monitor = StateObject(wrappedValue: NetworkMonitor(settingsStore: store, routeInspector: sharedRouteInspector))
     }
 
     var body: some Scene {

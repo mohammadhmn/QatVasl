@@ -892,3 +892,25 @@ struct TimelineSummary: Equatable {
         sampleCount: 0
     )
 }
+
+struct MonitorPerformanceSummary: Equatable {
+    let lastCheckDurationMs: Int?
+    let averageCheckDurationMs: Int?
+    let lastRouteInspectMs: Int?
+    let lastSnapshotProbeMs: Int?
+    let lastProxyEndpointMs: Int?
+    let lastCriticalServicesRefreshMs: Int?
+    let criticalServicesRefreshCount: Int
+    let persistenceFlushCount: Int
+
+    static let empty = MonitorPerformanceSummary(
+        lastCheckDurationMs: nil,
+        averageCheckDurationMs: nil,
+        lastRouteInspectMs: nil,
+        lastSnapshotProbeMs: nil,
+        lastProxyEndpointMs: nil,
+        lastCriticalServicesRefreshMs: nil,
+        criticalServicesRefreshCount: 0,
+        persistenceFlushCount: 0
+    )
+}

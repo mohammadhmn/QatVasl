@@ -3,6 +3,10 @@ import Foundation
 import Network
 
 final class ProbeEngine {
+    private enum Limits {
+        static let criticalServiceMaxConcurrency = 4
+    }
+
     private actor ResumeGate {
         private var resumed = false
 
@@ -86,57 +90,46 @@ final class ProbeEngine {
         }
 
         let timeout = min(settings.normalizedTimeout, 10)
+        let directSession = self.directSession
         let proxySession = settings.proxyEnabled ? proxySession(for: settings) : nil
-        var results: [CriticalServiceResult] = []
-        results.reserveCapacity(services.count)
+        let maxConcurrency = max(1, min(Limits.criticalServiceMaxConcurrency, services.count))
+        var orderedResults = Array<CriticalServiceResult?>(repeating: nil, count: services.count)
 
-        for service in services {
-            let directResult: ServiceRouteProbeResult?
-            if service.checkDirect {
-                directResult = await probeServiceRoute(
-                    target: service.url,
-                    timeout: timeout,
-                    session: directSession,
-                    route: .direct
-                )
-            } else {
-                directResult = nil
-            }
+        var startIndex = 0
+        while startIndex < services.count {
+            let endIndex = min(startIndex + maxConcurrency, services.count)
+            await withTaskGroup(of: (Int, CriticalServiceResult).self) { group in
+                for index in startIndex ..< endIndex {
+                    let service = services[index]
+                    let serviceID = service.id
+                    let serviceName = service.name
+                    let serviceURL = service.url
+                    let checkDirect = service.checkDirect
+                    let checkProxy = service.checkProxy
 
-            let proxyResult: ServiceRouteProbeResult?
-            if service.checkProxy {
-                if let proxySession {
-                    proxyResult = await probeServiceRoute(
-                        target: service.url,
-                        timeout: timeout,
-                        session: proxySession,
-                        route: .proxy
-                    )
-                } else {
-                    proxyResult = ServiceRouteProbeResult(
-                        route: .proxy,
-                        ok: false,
-                        statusCode: nil,
-                        latencyMs: nil,
-                        error: "Proxy disabled"
-                    )
+                    group.addTask {
+                        let result = await Self.makeCriticalServiceResult(
+                            id: serviceID,
+                            name: serviceName,
+                            url: serviceURL,
+                            checkDirect: checkDirect,
+                            checkProxy: checkProxy,
+                            timeout: timeout,
+                            directSession: directSession,
+                            proxySession: proxySession
+                        )
+                        return (index, result)
+                    }
                 }
-            } else {
-                proxyResult = nil
-            }
 
-            results.append(
-                CriticalServiceResult(
-                    id: service.id,
-                    name: service.name,
-                    url: service.url,
-                    direct: directResult,
-                    proxy: proxyResult
-                )
-            )
+                for await (index, result) in group {
+                    orderedResults[index] = result
+                }
+            }
+            startIndex = endIndex
         }
 
-        return results
+        return orderedResults.compactMap { $0 }
     }
 
     private func probeDirect(
@@ -225,7 +218,7 @@ final class ProbeEngine {
             )
         }
 
-        let request = makeRequest(url: url, timeout: timeout)
+        let request = Self.makeRequest(url: url, timeout: timeout)
         return await performProbe(
             kind: kind,
             target: target,
@@ -251,7 +244,7 @@ final class ProbeEngine {
             )
         }
 
-        let request = makeRequest(url: url, timeout: timeout)
+        let request = Self.makeRequest(url: url, timeout: timeout)
         return await performProbe(
             kind: kind,
             target: target,
@@ -292,7 +285,7 @@ final class ProbeEngine {
         )
     }
 
-    private func makeRequest(url: URL, timeout: TimeInterval) -> URLRequest {
+    private nonisolated static func makeRequest(url: URL, timeout: TimeInterval) -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
         request.timeoutInterval = timeout
@@ -331,12 +324,12 @@ final class ProbeEngine {
                 ok: false,
                 statusCode: nil,
                 latencyMs: Int(Date().timeIntervalSince(started) * 1000),
-                error: map(error: error)
+                error: Self.map(error: error)
             )
         }
     }
 
-    private func probeServiceRoute(
+    private nonisolated static func probeServiceRoute(
         target: String,
         timeout: TimeInterval,
         session: URLSession,
@@ -376,6 +369,59 @@ final class ProbeEngine {
                 error: map(error: error)
             )
         }
+    }
+
+    private nonisolated static func makeCriticalServiceResult(
+        id: String,
+        name: String,
+        url: String,
+        checkDirect: Bool,
+        checkProxy: Bool,
+        timeout: TimeInterval,
+        directSession: URLSession,
+        proxySession: URLSession?
+    ) async -> CriticalServiceResult {
+        let directResult: ServiceRouteProbeResult?
+        if checkDirect {
+            directResult = await probeServiceRoute(
+                target: url,
+                timeout: timeout,
+                session: directSession,
+                route: .direct
+            )
+        } else {
+            directResult = nil
+        }
+
+        let proxyResult: ServiceRouteProbeResult?
+        if checkProxy {
+            if let proxySession {
+                proxyResult = await probeServiceRoute(
+                    target: url,
+                    timeout: timeout,
+                    session: proxySession,
+                    route: .proxy
+                )
+            } else {
+                proxyResult = ServiceRouteProbeResult(
+                    route: .proxy,
+                    ok: false,
+                    statusCode: nil,
+                    latencyMs: nil,
+                    error: "Proxy disabled"
+                )
+            }
+        } else {
+            proxyResult = nil
+        }
+
+        return CriticalServiceResult(
+            id: id,
+            name: name,
+            url: url,
+            direct: directResult,
+            proxy: proxyResult
+        )
     }
 
     private func proxySession(for settings: MonitorSettings) -> URLSession {
@@ -436,7 +482,7 @@ final class ProbeEngine {
         }
     }
 
-    private func map(error: Error) -> String {
+    private nonisolated static func map(error: Error) -> String {
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
             switch nsError.code {

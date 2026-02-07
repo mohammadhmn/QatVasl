@@ -6,15 +6,19 @@ struct RouteContext: Sendable, Equatable {
 }
 
 actor RouteInspector {
-    private let cacheTTL: TimeInterval
+    private var cacheTTL: TimeInterval
     private var cache: (timestamp: Date, context: RouteContext)?
 
     init(cacheTTL: TimeInterval = 2) {
-        self.cacheTTL = cacheTTL
+        self.cacheTTL = Self.normalizedCacheTTL(cacheTTL)
     }
 
-    func inspect() async -> RouteContext {
-        if let cache, Date().timeIntervalSince(cache.timestamp) < cacheTTL {
+    func inspect(cacheTTL: TimeInterval? = nil, forceRefresh: Bool = false) async -> RouteContext {
+        if let cacheTTL {
+            self.cacheTTL = Self.normalizedCacheTTL(cacheTTL)
+        }
+
+        if !forceRefresh, let cache, Date().timeIntervalSince(cache.timestamp) < self.cacheTTL {
             return cache.context
         }
 
@@ -23,6 +27,10 @@ actor RouteInspector {
         }.value
         cache = (Date(), context)
         return context
+    }
+
+    private nonisolated static func normalizedCacheTTL(_ value: TimeInterval) -> TimeInterval {
+        max(1, min(60, value))
     }
 
     private nonisolated static func detectRouteContext() -> RouteContext {

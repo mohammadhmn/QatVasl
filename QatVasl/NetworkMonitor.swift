@@ -10,6 +10,12 @@ final class NetworkMonitor: ObservableObject {
         let timestamp: Date
     }
 
+    private struct ProxyEndpointConnectivityCache {
+        let key: String
+        let connected: Bool
+        let timestamp: Date
+    }
+
     private enum Limits {
         static let transitionHistory = 40
         static let healthSampleHistory = 2_000
@@ -17,6 +23,11 @@ final class NetworkMonitor: ObservableObject {
         static let settingsRestartDebounceMs = 700
         static let persistenceCoalesceSeconds: TimeInterval = 3
         static let persistenceMinFlushIntervalSeconds: TimeInterval = 45
+        static let checkDurationSampleHistory = 90
+        static let routeInspectorCacheTTLMin: TimeInterval = 2
+        static let routeInspectorCacheTTLMax: TimeInterval = 30
+        static let proxyEndpointConnectedCacheTTL: TimeInterval = 20
+        static let proxyEndpointFailedCacheTTL: TimeInterval = 8
     }
 
     @Published private(set) var currentState: ConnectivityState
@@ -29,6 +40,7 @@ final class NetworkMonitor: ObservableObject {
     @Published private(set) var latestError: String?
     @Published private(set) var transitionHistory: [StateTransition]
     @Published private(set) var healthSamples: [HealthSample]
+    @Published private(set) var performanceSummary: MonitorPerformanceSummary
     @Published private(set) var vpnDetected = false
     @Published private(set) var proxyDetected = false
     @Published private(set) var vpnClientLabel: String?
@@ -43,14 +55,26 @@ final class NetworkMonitor: ObservableObject {
     private let samplesKey = "qatvasl.health.samples.v1"
 
     private var loopTask: Task<Void, Never>?
+    private var criticalServicesRefreshTask: Task<Void, Never>?
     private var settingsObserver: AnyCancellable?
     private var persistenceFlushTask: Task<Void, Never>?
     private var notificationsAllowed = false
     private var lastNotificationSentAt: Date?
     private var lastCriticalServicesCheckAt: Date?
     private var lastPersistenceFlushAt: Date?
+    private var proxyEndpointConnectivityCache: ProxyEndpointConnectivityCache?
     private var pendingHistoryPersistence = false
     private var pendingSamplesPersistence = false
+    private var last24hSamplesCache: [HealthSample] = []
+    private var timelineSummary24hCache: TimelineSummary = .empty
+    private var checkDurationSamplesMs: [Int] = []
+    private var lastCheckDurationMs: Int?
+    private var lastRouteInspectMs: Int?
+    private var lastSnapshotProbeMs: Int?
+    private var lastProxyEndpointCheckMs: Int?
+    private var lastCriticalServicesRefreshMs: Int?
+    private var criticalServicesRefreshCount = 0
+    private var persistenceFlushCount = 0
     private var hasCompletedFirstCheck = false
 
     var displayState: ConnectivityState {
@@ -69,52 +93,11 @@ final class NetworkMonitor: ObservableObject {
     }
 
     var last24hSamples: [HealthSample] {
-        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
-        return healthSamples.filter { $0.timestamp >= cutoff }
+        last24hSamplesCache
     }
 
     var timelineSummary24h: TimelineSummary {
-        let recent = last24hSamples
-        guard !recent.isEmpty else {
-            return .empty
-        }
-
-        let uptimeCount = recent.filter { !Self.isOutageState($0.state) }.count
-        let uptimePercent = Int((Double(uptimeCount) / Double(recent.count) * 100).rounded())
-        let averageLatencyValues = recent.compactMap(\.averageLatencyMs)
-        let averageLatencyMs = averageLatencyValues.isEmpty
-            ? nil
-            : Int((Double(averageLatencyValues.reduce(0, +)) / Double(averageLatencyValues.count)).rounded())
-        let dropCount = transitionHistory.filter {
-            $0.timestamp >= Date().addingTimeInterval(-24 * 60 * 60) && Self.isOutageState($0.to)
-        }.count
-
-        let orderedSamples = recent.sorted { $0.timestamp < $1.timestamp }
-        var outageStart: Date?
-        var recoveries: [TimeInterval] = []
-
-        for sample in orderedSamples {
-            if Self.isOutageState(sample.state) {
-                if outageStart == nil {
-                    outageStart = sample.timestamp
-                }
-            } else if let start = outageStart {
-                recoveries.append(sample.timestamp.timeIntervalSince(start))
-                outageStart = nil
-            }
-        }
-
-        let meanRecoverySeconds = recoveries.isEmpty
-            ? nil
-            : Int((recoveries.reduce(0, +) / Double(recoveries.count)).rounded())
-
-        return TimelineSummary(
-            uptimePercent: uptimePercent,
-            dropCount: dropCount,
-            averageLatencyMs: averageLatencyMs,
-            meanRecoverySeconds: meanRecoverySeconds,
-            sampleCount: recent.count
-        )
+        timelineSummary24hCache
     }
 
     init(
@@ -134,6 +117,9 @@ final class NetworkMonitor: ObservableObject {
         self.transitionHistory = Self.loadHistory(from: defaults, key: historyKey)
         self.healthSamples = Self.loadSamples(from: defaults, key: samplesKey)
         self.criticalServiceResults = []
+        self.performanceSummary = .empty
+        recomputeTimelineSummary()
+        updatePerformanceSummary()
 
         settingsObserver = settingsStore.$settings
             .dropFirst()
@@ -153,6 +139,7 @@ final class NetworkMonitor: ObservableObject {
 
     deinit {
         loopTask?.cancel()
+        criticalServicesRefreshTask?.cancel()
         persistenceFlushTask?.cancel()
     }
 
@@ -165,12 +152,15 @@ final class NetworkMonitor: ObservableObject {
     func clearHistory() {
         transitionHistory = []
         healthSamples = []
+        last24hSamplesCache = []
+        timelineSummary24hCache = .empty
         pendingHistoryPersistence = false
         pendingSamplesPersistence = false
         persistenceFlushTask?.cancel()
         persistenceFlushTask = nil
         defaults.removeObject(forKey: historyKey)
         defaults.removeObject(forKey: samplesKey)
+        updatePerformanceSummary()
     }
 
     private func restartLoop(runImmediately: Bool) {
@@ -210,13 +200,19 @@ final class NetworkMonitor: ObservableObject {
         }
         isChecking = true
         defer { isChecking = false }
+        let checkStarted = Date()
 
         let settings = settingsStore.settings
-        let routeContext = await routeInspector.inspect()
+        let routeStarted = Date()
+        let routeContext = await routeInspector.inspect(cacheTTL: routeInspectorCacheTTL(for: settings))
+        lastRouteInspectMs = Int(Date().timeIntervalSince(routeStarted) * 1000)
+
+        let snapshotStarted = Date()
         let snapshot = await probeEngine.runSnapshot(settings: settings)
+        lastSnapshotProbeMs = Int(Date().timeIntervalSince(snapshotStarted) * 1000)
         let timestamp = Date()
-        await refreshCriticalServicesIfNeeded(settings: settings, timestamp: timestamp)
-        let proxyEndpointConnected = await probeEngine.isProxyEndpointConnected(settings: settings)
+        triggerCriticalServicesRefreshIfNeeded(settings: settings, timestamp: timestamp)
+        let proxyEndpointConnected = await resolveProxyEndpointConnected(settings: settings, snapshot: snapshot)
         let proxyIsWorking = apply(
             routeContext: routeContext,
             snapshot: snapshot,
@@ -236,16 +232,38 @@ final class NetworkMonitor: ObservableObject {
             appendTransition(from: stateChange.previous, to: stateChange.current, at: stateChange.timestamp)
         }
 
+        recordCheckDuration(Int(Date().timeIntervalSince(checkStarted) * 1000))
+        updatePerformanceSummary()
         await maybeNotifyTransition(from: stateChange.previous, to: stateChange.current, settings: settings)
     }
 
-    private func refreshCriticalServicesIfNeeded(settings: MonitorSettings, timestamp: Date) async {
+    private func triggerCriticalServicesRefreshIfNeeded(settings: MonitorSettings, timestamp: Date) {
         guard shouldRefreshCriticalServices(now: timestamp, interval: settings.normalizedInterval) else {
             return
         }
-
-        criticalServiceResults = await probeEngine.runCriticalServices(settings: settings)
+        guard criticalServicesRefreshTask == nil else {
+            return
+        }
         lastCriticalServicesCheckAt = timestamp
+
+        criticalServicesRefreshTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            let started = Date()
+            let results = await probeEngine.runCriticalServices(settings: settings)
+            guard !Task.isCancelled else {
+                criticalServicesRefreshTask = nil
+                return
+            }
+
+            criticalServiceResults = results
+            lastCriticalServicesRefreshMs = Int(Date().timeIntervalSince(started) * 1000)
+            criticalServicesRefreshCount += 1
+            updatePerformanceSummary()
+            criticalServicesRefreshTask = nil
+        }
     }
 
     private func applyAssessment(_ assessment: ConnectivityAssessment, snapshot: ProbeSnapshot) -> StateChange {
@@ -361,6 +379,7 @@ final class NetworkMonitor: ObservableObject {
         }
         transitionHistory = updated
 
+        recomputeTimelineSummary()
         pendingHistoryPersistence = true
         schedulePersistenceFlushIfNeeded()
     }
@@ -401,6 +420,7 @@ final class NetworkMonitor: ObservableObject {
         }
 
         healthSamples = updated
+        recomputeTimelineSummary()
         pendingSamplesPersistence = true
         schedulePersistenceFlushIfNeeded()
     }
@@ -424,6 +444,133 @@ final class NetworkMonitor: ObservableObject {
 
     private static func isOutageState(_ state: ConnectivityState) -> Bool {
         state == .offline || state == .vpnIssue
+    }
+
+    private func routeInspectorCacheTTL(for settings: MonitorSettings) -> TimeInterval {
+        let adaptive = settings.normalizedInterval * 0.5
+        return max(Limits.routeInspectorCacheTTLMin, min(Limits.routeInspectorCacheTTLMax, adaptive))
+    }
+
+    private func resolveProxyEndpointConnected(settings: MonitorSettings, snapshot: ProbeSnapshot) async -> Bool {
+        guard settings.proxyEnabled else {
+            proxyEndpointConnectivityCache = nil
+            return false
+        }
+
+        let now = Date()
+        let key = proxyEndpointCacheKey(for: settings)
+
+        if snapshot.blockedProxy.ok {
+            proxyEndpointConnectivityCache = ProxyEndpointConnectivityCache(
+                key: key,
+                connected: true,
+                timestamp: now
+            )
+            return true
+        }
+
+        if
+            let cache = proxyEndpointConnectivityCache,
+            cache.key == key,
+            now.timeIntervalSince(cache.timestamp) < proxyEndpointCacheTTL(for: cache.connected)
+        {
+            return cache.connected
+        }
+
+        let started = Date()
+        let connected = await probeEngine.isProxyEndpointConnected(settings: settings)
+        lastProxyEndpointCheckMs = Int(Date().timeIntervalSince(started) * 1000)
+        proxyEndpointConnectivityCache = ProxyEndpointConnectivityCache(
+            key: key,
+            connected: connected,
+            timestamp: now
+        )
+        return connected
+    }
+
+    private func proxyEndpointCacheKey(for settings: MonitorSettings) -> String {
+        "\(settings.proxyType.rawValue)|\(settings.proxyHost.lowercased())|\(settings.proxyPort)"
+    }
+
+    private func proxyEndpointCacheTTL(for connected: Bool) -> TimeInterval {
+        connected ? Limits.proxyEndpointConnectedCacheTTL : Limits.proxyEndpointFailedCacheTTL
+    }
+
+    private func recordCheckDuration(_ durationMs: Int) {
+        lastCheckDurationMs = durationMs
+        checkDurationSamplesMs.append(durationMs)
+        if checkDurationSamplesMs.count > Limits.checkDurationSampleHistory {
+            checkDurationSamplesMs.removeFirst(checkDurationSamplesMs.count - Limits.checkDurationSampleHistory)
+        }
+    }
+
+    private func recomputeTimelineSummary(now: Date = Date()) {
+        let cutoff = now.addingTimeInterval(-24 * 60 * 60)
+        let recent = healthSamples.filter { $0.timestamp >= cutoff }
+        last24hSamplesCache = recent
+
+        guard !recent.isEmpty else {
+            timelineSummary24hCache = .empty
+            return
+        }
+
+        let uptimeCount = recent.filter { !Self.isOutageState($0.state) }.count
+        let uptimePercent = Int((Double(uptimeCount) / Double(recent.count) * 100).rounded())
+
+        let averageLatencyValues = recent.compactMap(\.averageLatencyMs)
+        let averageLatencyMs = averageLatencyValues.isEmpty
+            ? nil
+            : Int((Double(averageLatencyValues.reduce(0, +)) / Double(averageLatencyValues.count)).rounded())
+
+        let dropCount = transitionHistory.filter {
+            $0.timestamp >= cutoff && Self.isOutageState($0.to)
+        }.count
+
+        var outageStart: Date?
+        var recoveries: [TimeInterval] = []
+        for sample in recent.reversed() {
+            if Self.isOutageState(sample.state) {
+                if outageStart == nil {
+                    outageStart = sample.timestamp
+                }
+            } else if let start = outageStart {
+                recoveries.append(sample.timestamp.timeIntervalSince(start))
+                outageStart = nil
+            }
+        }
+
+        let meanRecoverySeconds = recoveries.isEmpty
+            ? nil
+            : Int((recoveries.reduce(0, +) / Double(recoveries.count)).rounded())
+
+        timelineSummary24hCache = TimelineSummary(
+            uptimePercent: uptimePercent,
+            dropCount: dropCount,
+            averageLatencyMs: averageLatencyMs,
+            meanRecoverySeconds: meanRecoverySeconds,
+            sampleCount: recent.count
+        )
+    }
+
+    private func updatePerformanceSummary() {
+        let averageCheckDurationMs: Int?
+        if checkDurationSamplesMs.isEmpty {
+            averageCheckDurationMs = nil
+        } else {
+            let total = checkDurationSamplesMs.reduce(0, +)
+            averageCheckDurationMs = Int((Double(total) / Double(checkDurationSamplesMs.count)).rounded())
+        }
+
+        performanceSummary = MonitorPerformanceSummary(
+            lastCheckDurationMs: lastCheckDurationMs,
+            averageCheckDurationMs: averageCheckDurationMs,
+            lastRouteInspectMs: lastRouteInspectMs,
+            lastSnapshotProbeMs: lastSnapshotProbeMs,
+            lastProxyEndpointMs: lastProxyEndpointCheckMs,
+            lastCriticalServicesRefreshMs: lastCriticalServicesRefreshMs,
+            criticalServicesRefreshCount: criticalServicesRefreshCount,
+            persistenceFlushCount: persistenceFlushCount
+        )
     }
 
     private func schedulePersistenceFlushIfNeeded() {
@@ -480,6 +627,8 @@ final class NetworkMonitor: ObservableObject {
 
         if wroteAny {
             lastPersistenceFlushAt = now
+            persistenceFlushCount += 1
+            updatePerformanceSummary()
         }
 
         if !force, (pendingHistoryPersistence || pendingSamplesPersistence) {
@@ -589,6 +738,16 @@ final class NetworkMonitor: ObservableObject {
         - Avg latency: \(timeline.averageLatencyMs.map { "\($0) ms" } ?? "N/A")
         - Mean recovery: \(timeline.meanRecoverySeconds.map { "\($0) s" } ?? "N/A")
         - Samples: \(timeline.sampleCount)
+
+        Performance
+        - Last check: \(performanceSummary.lastCheckDurationMs.map { "\($0) ms" } ?? "N/A")
+        - Avg check: \(performanceSummary.averageCheckDurationMs.map { "\($0) ms" } ?? "N/A")
+        - Last route inspect: \(performanceSummary.lastRouteInspectMs.map { "\($0) ms" } ?? "N/A")
+        - Last snapshot probes: \(performanceSummary.lastSnapshotProbeMs.map { "\($0) ms" } ?? "N/A")
+        - Last proxy endpoint check: \(performanceSummary.lastProxyEndpointMs.map { "\($0) ms" } ?? "N/A")
+        - Last services refresh: \(performanceSummary.lastCriticalServicesRefreshMs.map { "\($0) ms" } ?? "N/A")
+        - Services refresh count: \(performanceSummary.criticalServicesRefreshCount)
+        - Persistence flushes: \(performanceSummary.persistenceFlushCount)
 
         Probe Snapshot
         \(lastSnapshotSummary)
