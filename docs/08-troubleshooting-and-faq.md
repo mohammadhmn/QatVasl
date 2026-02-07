@@ -1,0 +1,112 @@
+# Troubleshooting and FAQ
+
+## Q1) I launched app but see nothing in menu bar
+
+Checklist:
+
+1. Confirm app process exists:
+   - `pgrep -x QatVasl`
+2. If not running:
+   - `just dev`
+3. Ensure app is not blocked by a crash (check Console/logs):
+   - `just logs`
+
+## Q2) Dashboard closed and app vanished from Dock
+
+This is expected behavior.
+
+QatVasl intentionally switches to menu-bar-only mode when no app window is visible.  
+Use menu bar item → `Dashboard` to reopen window.
+
+## Q3) Route says `TUN ON`. What does that mean?
+
+`TUN ON` means system-level tunnel/proxy overlay is active.  
+Direct-path verdict is not authoritative in this mode because traffic is being routed through overlay.
+
+If you need true direct-path test:
+
+1. Temporarily disable VPN/TUN/system proxy.
+2. Refresh QatVasl.
+
+## Q4) VPN works in client, but app does not show `VPN OK`
+
+Check in this order:
+
+1. Proxy host/port/type in QatVasl settings.
+2. Ensure local endpoint is actually listening.
+3. Confirm blocked target URL is valid.
+4. Press `Refresh`.
+
+Useful port check:
+
+```bash
+lsof -nP -iTCP:10808 -sTCP:LISTEN
+```
+
+If no listener appears, VPN client may not expose local proxy at that port.
+
+## Q5) Which VPN app is shown in `Client:` and can it be wrong?
+
+Client label is best-effort:
+
+1. It checks connected network services (`scutil --nc list`).
+2. If not found, it checks running processes for known VPN tools.
+
+So yes, it can be unknown or occasionally imperfect.
+
+## Q6) Notifications do not show
+
+1. In QatVasl settings, enable notifications.
+2. In macOS System Settings, allow notifications for QatVasl.
+3. Trigger transition (for example by changing network state) and verify.
+
+## Q7) App feels slow or laggy
+
+Current optimizations already include:
+
+- off-main route detection,
+- session reuse,
+- lightweight probes,
+- debounced settings writes.
+
+If still laggy:
+
+1. Increase interval (for example from 12s to 30–60s).
+2. Increase timeout if network is very unstable.
+3. Avoid unnecessary rapid settings edits.
+
+## Q8) Build fails after changes
+
+Do this sequence:
+
+```bash
+just clean
+just build-debug
+```
+
+Then inspect first compiler error (not last).
+
+## Q9) I want to fully reset app state
+
+```bash
+just reset-settings
+```
+
+Then relaunch app.
+
+## Q10) How to inspect tunnel/proxy state manually?
+
+- Connected VPN services:
+  - `scutil --nc list`
+- Interfaces (look for `utun*`):
+  - `ifconfig`
+- Known VPN processes:
+  - `ps -axo comm | egrep -i 'happ|openvpn|wireguard|v2ray|xray|sing-box|clash'`
+
+## Q11) How should I operate daily in unstable conditions?
+
+Use:
+
+- `docs/03-daily-ops-checklist.md`
+
+for a strict ISP/VPN rotation workflow to avoid random troubleshooting loops.
