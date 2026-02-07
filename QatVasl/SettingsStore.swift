@@ -3,6 +3,11 @@ import Foundation
 
 @MainActor
 final class SettingsStore: ObservableObject {
+    private enum DetectedProfileResolution {
+        case selectedExisting(String)
+        case createdNew(String)
+    }
+
     @Published var settings: MonitorSettings
 
     @Published var launchAtLoginError: String?
@@ -13,10 +18,16 @@ final class SettingsStore: ObservableObject {
     private let storageKey = "qatvasl.settings.v1"
     private var persistenceCancellable: AnyCancellable?
     private let ispDetector: ISPDetector
+    private let routeInspector: RouteInspector
 
-    init(defaults: UserDefaults = .standard, ispDetector: ISPDetector? = nil) {
+    init(
+        defaults: UserDefaults = .standard,
+        ispDetector: ISPDetector? = nil,
+        routeInspector: RouteInspector? = nil
+    ) {
         self.defaults = defaults
         self.ispDetector = ispDetector ?? ISPDetector()
+        self.routeInspector = routeInspector ?? RouteInspector()
         if
             let data = defaults.data(forKey: storageKey),
             let decoded = try? JSONDecoder().decode(MonitorSettings.self, from: data)
@@ -40,7 +51,7 @@ final class SettingsStore: ObservableObject {
 
         if settings.autoDetectISPOnLaunch {
             Task { [weak self] in
-                await self?.detectAndRenameActiveISPProfile()
+                await self?.detectAndSelectISPProfile()
             }
         }
     }
@@ -81,24 +92,47 @@ final class SettingsStore: ObservableObject {
         }
     }
 
-    func detectAndRenameActiveISPProfile() async {
+    func detectAndSelectISPProfile() async {
         guard !isDetectingISP else { return }
 
         isDetectingISP = true
         defer { isDetectingISP = false }
 
+        let routeContext = await routeInspector.inspect()
+        if routeContext.vpnActive {
+            let clientName = routeContext.vpnClientName ?? "Unknown VPN"
+            detectedISPMessage = "VPN is active (\(clientName)). Disconnect VPN to detect direct ISP."
+            return
+        }
+
         do {
             let result = try await ispDetector.detectCurrentISP()
-            renameISPProfile(settings.activeProfileID, to: result.providerName)
+            let resolution = upsertDetectedISPProfile(named: result.providerName)
 
-            if let ip = result.publicIP, !ip.isEmpty {
-                detectedISPMessage = "Detected \(result.providerName) (\(ip)) via \(result.source)."
-            } else {
-                detectedISPMessage = "Detected \(result.providerName) via \(result.source)."
+            let actionText: String
+            switch resolution {
+            case let .selectedExisting(name):
+                actionText = "Selected existing profile \(name)"
+            case let .createdNew(name):
+                actionText = "Created and selected profile \(name)"
             }
+
+            let details: String
+            if let ip = result.publicIP, !ip.isEmpty {
+                details = "Detected \(result.providerName) (\(ip)) via \(result.source)."
+            } else {
+                details = "Detected \(result.providerName) via \(result.source)."
+            }
+
+            detectedISPMessage = "\(details) \(actionText)."
         } catch {
             detectedISPMessage = "Couldn’t detect ISP automatically. Check connection and retry."
         }
+    }
+
+    @available(*, deprecated, message: "Use detectAndSelectISPProfile()")
+    func detectAndRenameActiveISPProfile() async {
+        await detectAndSelectISPProfile()
     }
 
     func updateCriticalService(
@@ -194,5 +228,36 @@ final class SettingsStore: ObservableObject {
             return
         }
         defaults.set(data, forKey: storageKey)
+    }
+
+    private func upsertDetectedISPProfile(named providerName: String) -> DetectedProfileResolution {
+        let trimmedProvider = providerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeProvider = trimmedProvider.isEmpty ? "Detected ISP" : trimmedProvider
+        let normalizedTarget = normalizedISPName(safeProvider)
+
+        var resolution = DetectedProfileResolution.createdNew(safeProvider)
+        mutateSettings { updated in
+            if let existingProfile = updated.ispProfiles.first(where: { normalizedISPName($0.name) == normalizedTarget }) {
+                updated.selectProfile(id: existingProfile.id)
+                resolution = .selectedExisting(existingProfile.name)
+                return
+            }
+
+            updated.addProfile(named: safeProvider)
+            if let activeName = updated.activeProfile?.name {
+                resolution = .createdNew(activeName)
+            } else {
+                resolution = .createdNew(safeProvider)
+            }
+        }
+
+        return resolution
+    }
+
+    private func normalizedISPName(_ name: String) -> String {
+        name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     }
 }

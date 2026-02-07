@@ -144,7 +144,7 @@ struct SettingsView: View {
                 HStack(spacing: 10) {
                     Button {
                         Task {
-                            await settingsStore.detectAndRenameActiveISPProfile()
+                            await settingsStore.detectAndSelectISPProfile()
                         }
                     } label: {
                         Label(
