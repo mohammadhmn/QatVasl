@@ -2,10 +2,16 @@ import Foundation
 import SwiftUI
 
 struct SettingsView: View {
+    private struct ServiceEditSelection: Identifiable, Equatable {
+        let id: String
+    }
+
     let embedded: Bool
 
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var monitor: NetworkMonitor
+    @State private var servicesExpanded = false
+    @State private var editingService: ServiceEditSelection?
 
     private var settings: MonitorSettings {
         settingsStore.settings
@@ -26,6 +32,9 @@ struct SettingsView: View {
                 }
                 .frame(minWidth: 640, minHeight: 700)
             }
+        }
+        .sheet(item: $editingService) { selection in
+            CriticalServiceEditorSheet(serviceID: selection.id)
         }
     }
 
@@ -249,7 +258,7 @@ struct SettingsView: View {
     private var routesAndServicesCard: some View {
         GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.12)) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Routes & Critical Services")
+                Text("Routes")
                     .font(.headline)
 
                 Toggle("Enable proxy checks", isOn: binding(\.proxyEnabled))
@@ -271,84 +280,46 @@ struct SettingsView: View {
 
                 Divider()
 
-                HStack {
-                    Text("Critical services")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Button {
-                        settingsStore.addCriticalService()
-                    } label: {
-                        Label("Add", systemImage: "plus")
-                    }
-                    .buttonStyle(.glass)
-                }
-
-                Text("Track key services across direct and proxy paths.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                ForEach(settings.criticalServices) { service in
-                    VStack(alignment: .leading, spacing: 8) {
+                DisclosureGroup(isExpanded: $servicesExpanded) {
+                    VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Toggle(
-                                service.name,
-                                isOn: Binding(
-                                    get: { service.enabled },
-                                    set: { settingsStore.updateCriticalService(id: service.id, enabled: $0) }
-                                )
-                            )
-                            .toggleStyle(.switch)
-
+                            Text("Critical services")
+                                .font(.subheadline.weight(.semibold))
                             Spacer()
-
-                            Button(role: .destructive) {
-                                settingsStore.removeCriticalService(id: service.id)
+                            Button {
+                                settingsStore.addCriticalService()
                             } label: {
-                                Image(systemName: "trash")
+                                Label("Add", systemImage: "plus")
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.glass)
                         }
 
-                        TextField(
-                            "Service name",
-                            text: Binding(
-                                get: { service.name },
-                                set: { settingsStore.updateCriticalService(id: service.id, name: $0) }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
+                        Text("Track key services across direct and proxy paths.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
 
-                        TextField(
-                            "Service URL",
-                            text: Binding(
-                                get: { service.url },
-                                set: { settingsStore.updateCriticalService(id: service.id, url: $0) }
-                            )
-                        )
-                        .textFieldStyle(.roundedBorder)
-
-                        HStack {
-                            Toggle(
-                                "Direct",
-                                isOn: Binding(
-                                    get: { service.checkDirect },
-                                    set: { settingsStore.updateCriticalService(id: service.id, checkDirect: $0) }
-                                )
-                            )
-                            Toggle(
-                                "Proxy",
-                                isOn: Binding(
-                                    get: { service.checkProxy },
-                                    set: { settingsStore.updateCriticalService(id: service.id, checkProxy: $0) }
-                                )
-                            )
+                        if settings.criticalServices.isEmpty {
+                            Text("No services configured yet.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .toggleStyle(.switch)
-                        .font(.caption)
+
+                        ForEach(settings.criticalServices) { service in
+                            criticalServiceRow(service)
+                        }
                     }
-                    .padding(10)
-                    .glassEffect(.regular.tint(.white.opacity(0.02)), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.top, 4)
+                } label: {
+                    HStack(spacing: 8) {
+                        Label("Advanced / Services", systemImage: "slider.horizontal.3")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text("\(settings.criticalServices.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .disclosureGroupStyle(.automatic)
             }
         }
     }
@@ -440,6 +411,53 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private func criticalServiceRow(_ service: CriticalServiceConfig) -> some View {
+        HStack(spacing: 10) {
+            Toggle(
+                "Enabled",
+                isOn: Binding(
+                    get: { service.enabled },
+                    set: { settingsStore.updateCriticalService(id: service.id, enabled: $0) }
+                )
+            )
+            .labelsHidden()
+            .toggleStyle(.switch)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(serviceName(for: service))
+                    .font(.subheadline.weight(.semibold))
+
+                Text(service.url)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer(minLength: 8)
+
+            Button("Edit") {
+                editingService = ServiceEditSelection(id: service.id)
+            }
+            .buttonStyle(.glass)
+
+            Button(role: .destructive) {
+                settingsStore.removeCriticalService(id: service.id)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(10)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func serviceName(for service: CriticalServiceConfig) -> String {
+        let trimmed = service.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Unnamed service" : trimmed
     }
 
     @ViewBuilder
@@ -539,5 +557,105 @@ struct SettingsView: View {
 
     private func hourLabel(_ hour: Int) -> String {
         String(format: "%02d:00", max(0, min(hour, 23)))
+    }
+}
+
+private struct CriticalServiceEditorSheet: View {
+    let serviceID: String
+
+    @EnvironmentObject private var settingsStore: SettingsStore
+    @Environment(\.dismiss) private var dismiss
+
+    private var service: CriticalServiceConfig? {
+        settingsStore.settings.criticalServices.first(where: { $0.id == serviceID })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if service != nil {
+                HStack {
+                    Text("Edit Service")
+                        .font(.title3.weight(.semibold))
+                    Spacer()
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+
+                TextField("Service name", text: nameBinding)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("Service URL", text: urlBinding)
+                    .textFieldStyle(.roundedBorder)
+
+                Toggle("Enabled", isOn: enabledBinding)
+                    .toggleStyle(.switch)
+
+                Divider()
+
+                Text("Routes")
+                    .font(.subheadline.weight(.semibold))
+
+                Toggle("Check direct route", isOn: checkDirectBinding)
+                    .toggleStyle(.switch)
+
+                Toggle("Check proxy route", isOn: checkProxyBinding)
+                    .toggleStyle(.switch)
+
+                Spacer(minLength: 0)
+            } else {
+                Text("Service not found")
+                    .font(.headline)
+                Text("The selected service no longer exists.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Spacer()
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(18)
+        .frame(minWidth: 460, maxWidth: 460, minHeight: 320)
+    }
+
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { service?.name ?? "" },
+            set: { settingsStore.updateCriticalService(id: serviceID, name: $0) }
+        )
+    }
+
+    private var urlBinding: Binding<String> {
+        Binding(
+            get: { service?.url ?? "" },
+            set: { settingsStore.updateCriticalService(id: serviceID, url: $0) }
+        )
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { service?.enabled ?? false },
+            set: { settingsStore.updateCriticalService(id: serviceID, enabled: $0) }
+        )
+    }
+
+    private var checkDirectBinding: Binding<Bool> {
+        Binding(
+            get: { service?.checkDirect ?? true },
+            set: { settingsStore.updateCriticalService(id: serviceID, checkDirect: $0) }
+        )
+    }
+
+    private var checkProxyBinding: Binding<Bool> {
+        Binding(
+            get: { service?.checkProxy ?? true },
+            set: { settingsStore.updateCriticalService(id: serviceID, checkProxy: $0) }
+        )
     }
 }
