@@ -6,13 +6,17 @@ final class SettingsStore: ObservableObject {
     @Published var settings: MonitorSettings
 
     @Published var launchAtLoginError: String?
+    @Published var detectedISPMessage: String?
+    @Published var isDetectingISP = false
 
     private let defaults: UserDefaults
     private let storageKey = "qatvasl.settings.v1"
     private var persistenceCancellable: AnyCancellable?
+    private let ispDetector: ISPDetector
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, ispDetector: ISPDetector = ISPDetector()) {
         self.defaults = defaults
+        self.ispDetector = ispDetector
         if
             let data = defaults.data(forKey: storageKey),
             let decoded = try? JSONDecoder().decode(MonitorSettings.self, from: data)
@@ -33,6 +37,12 @@ final class SettingsStore: ObservableObject {
             .sink { [weak self] settings in
                 self?.persist(settings)
             }
+
+        if settings.autoDetectISPOnLaunch {
+            Task { [weak self] in
+                await self?.detectAndRenameActiveISPProfile()
+            }
+        }
     }
 
     func resetToDefaults() {
@@ -75,6 +85,26 @@ final class SettingsStore: ObservableObject {
         updated.renameProfile(id: id, name: name)
         updated.syncActiveProfileFromCurrentValues()
         settings = updated
+    }
+
+    func detectAndRenameActiveISPProfile() async {
+        guard !isDetectingISP else { return }
+
+        isDetectingISP = true
+        defer { isDetectingISP = false }
+
+        do {
+            let result = try await ispDetector.detectCurrentISP()
+            renameISPProfile(settings.activeProfileID, to: result.providerName)
+
+            if let ip = result.publicIP, !ip.isEmpty {
+                detectedISPMessage = "Detected \(result.providerName) (\(ip)) via \(result.source)."
+            } else {
+                detectedISPMessage = "Detected \(result.providerName) via \(result.source)."
+            }
+        } catch {
+            detectedISPMessage = "Couldn’t detect ISP automatically. Check connection and retry."
+        }
     }
 
     func updateCriticalService(

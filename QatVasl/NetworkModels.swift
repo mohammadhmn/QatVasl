@@ -347,6 +347,7 @@ struct MonitorSettings: Codable, Equatable {
     var quietHoursStart: Int
     var quietHoursEnd: Int
     var launchAtLogin: Bool
+    var autoDetectISPOnLaunch: Bool
 
     enum CodingKeys: String, CodingKey {
         case intervalSeconds
@@ -368,6 +369,7 @@ struct MonitorSettings: Codable, Equatable {
         case quietHoursStart
         case quietHoursEnd
         case launchAtLogin
+        case autoDetectISPOnLaunch
     }
 
     static var defaults: MonitorSettings {
@@ -390,7 +392,8 @@ struct MonitorSettings: Codable, Equatable {
             quietHoursEnabled: false,
             quietHoursStart: 0,
             quietHoursEnd: 7,
-            launchAtLogin: false
+            launchAtLogin: false,
+            autoDetectISPOnLaunch: true
         )
     }
 
@@ -413,7 +416,8 @@ struct MonitorSettings: Codable, Equatable {
         quietHoursEnabled: Bool,
         quietHoursStart: Int,
         quietHoursEnd: Int,
-        launchAtLogin: Bool
+        launchAtLogin: Bool,
+        autoDetectISPOnLaunch: Bool
     ) {
         self.intervalSeconds = intervalSeconds
         self.timeoutSeconds = timeoutSeconds
@@ -434,6 +438,7 @@ struct MonitorSettings: Codable, Equatable {
         self.quietHoursStart = quietHoursStart
         self.quietHoursEnd = quietHoursEnd
         self.launchAtLogin = launchAtLogin
+        self.autoDetectISPOnLaunch = autoDetectISPOnLaunch
         sanitizeProfiles()
         sanitizeCriticalServices()
     }
@@ -461,6 +466,7 @@ struct MonitorSettings: Codable, Equatable {
         quietHoursStart = try container.decodeIfPresent(Int.self, forKey: .quietHoursStart) ?? defaults.quietHoursStart
         quietHoursEnd = try container.decodeIfPresent(Int.self, forKey: .quietHoursEnd) ?? defaults.quietHoursEnd
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? defaults.launchAtLogin
+        autoDetectISPOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .autoDetectISPOnLaunch) ?? defaults.autoDetectISPOnLaunch
 
         sanitizeProfiles()
         sanitizeCriticalServices()

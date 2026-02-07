@@ -124,6 +124,31 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                HStack(spacing: 10) {
+                    Button {
+                        Task {
+                            await settingsStore.detectAndRenameActiveISPProfile()
+                        }
+                    } label: {
+                        Label(
+                            settingsStore.isDetectingISP ? "Detecting…" : "Auto-detect current ISP",
+                            systemImage: "dot.radiowaves.left.and.right"
+                        )
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(settingsStore.isDetectingISP)
+
+                    if let detectedISPMessage = settingsStore.detectedISPMessage, !detectedISPMessage.isEmpty {
+                        Text(detectedISPMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Toggle("Auto-detect ISP on launch", isOn: binding(\.autoDetectISPOnLaunch))
+                    .toggleStyle(.switch)
             }
         }
     }
