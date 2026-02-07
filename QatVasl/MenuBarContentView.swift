@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @EnvironmentObject private var monitor: NetworkMonitor
+    @EnvironmentObject private var iranPulseMonitor: IranPulseMonitor
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var navigationStore: DashboardNavigationStore
     @Environment(\.openWindow) private var openWindow
@@ -40,6 +41,23 @@ struct MenuBarContentView: View {
                 Text("\(monitor.routeModeLabel) · Proxy \(settings.proxyHost):\(settings.proxyPort)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                if settings.iranPulseEnabled {
+                    HStack {
+                        Label("Iran pulse", systemImage: iranPulseMonitor.snapshot.severity.systemImage)
+                            .font(.caption2)
+                            .foregroundStyle(iranPulseMonitor.snapshot.severity.accentColor)
+                        Spacer()
+                        if iranPulseMonitor.isChecking {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text(iranPulseMonitor.snapshot.compactLabel)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(iranPulseMonitor.snapshot.severity.accentColor)
+                        }
+                    }
+                }
 
                 if let activeProfile = settings.activeProfile {
                     Text("ISP \(activeProfile.name)")

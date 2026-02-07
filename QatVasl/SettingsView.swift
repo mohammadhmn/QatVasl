@@ -10,6 +10,7 @@ struct SettingsView: View {
 
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var monitor: NetworkMonitor
+    @EnvironmentObject private var iranPulseMonitor: IranPulseMonitor
     @State private var servicesExpanded = false
     @State private var editingService: ServiceEditSelection?
 
@@ -54,6 +55,7 @@ struct SettingsView: View {
 
             profilesAndPresetsCard
             monitoringAndTargetsCard
+            nationalMonitoringCard
             websiteTargetsCard
             routesAndServicesCard
             notificationsAndSystemCard
@@ -250,6 +252,66 @@ struct SettingsView: View {
                         Label("Reset website targets", systemImage: "arrow.counterclockwise")
                     }
                     .buttonStyle(.glass)
+                }
+            }
+        }
+    }
+
+    private var nationalMonitoringCard: some View {
+        GlassCard(cornerRadius: 18, tint: .orange.opacity(0.12)) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("National Monitoring")
+                    .font(.headline)
+
+                Text("Track Iran-wide internet status via Vanillapp Radar and OONI.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Enable Iran internet pulse", isOn: binding(\.iranPulseEnabled))
+
+                if settings.iranPulseEnabled {
+                    HStack {
+                        Text("Interval")
+                        Spacer()
+                        Stepper(value: binding(\.iranPulseIntervalMinutes), in: 2...60, step: 1) {
+                            Text("\(Int(settings.iranPulseIntervalMinutes)) min")
+                                .frame(width: 90, alignment: .trailing)
+                        }
+                        .frame(width: 170)
+                    }
+
+                    Toggle("Use Vanillapp Radar", isOn: binding(\.iranPulseVanillappEnabled))
+                    Toggle("Use OONI", isOn: binding(\.iranPulseOoniEnabled))
+
+                    if !settings.iranPulseVanillappEnabled && !settings.iranPulseOoniEnabled {
+                        Text("Enable at least one provider to produce a pulse score.")
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                    }
+
+                    HStack(spacing: 10) {
+                        Label(
+                            iranPulseMonitor.snapshot.severity.title,
+                            systemImage: iranPulseMonitor.snapshot.severity.systemImage
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(iranPulseMonitor.snapshot.severity.accentColor)
+
+                        Text(iranPulseMonitor.snapshot.summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+
+                        Spacer()
+
+                        Button {
+                            iranPulseMonitor.refreshNow()
+                        } label: {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(iranPulseMonitor.isChecking)
+                    }
                 }
             }
         }

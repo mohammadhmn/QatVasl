@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var monitor: NetworkMonitor
+    @EnvironmentObject private var iranPulseMonitor: IranPulseMonitor
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var navigationStore: DashboardNavigationStore
 
@@ -111,6 +112,7 @@ struct ContentView: View {
                     case .live:
                         liveStatusSection
                         diagnosisSection
+                        iranPulseSection
                         probesSection
                     case .services:
                         servicesSection
@@ -265,6 +267,94 @@ struct ContentView: View {
                         HStack(spacing: 8) {
                             exportButton
                             settingsButton
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var iranPulseSection: some View {
+        let pulse = iranPulseMonitor.snapshot
+        return GlassCard(cornerRadius: 18, tint: pulse.severity.accentColor.opacity(0.14)) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Iran Internet Pulse")
+                            .font(.headline)
+                        Text(pulse.summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        if iranPulseMonitor.isChecking {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Label(
+                            pulse.severity.title,
+                            systemImage: pulse.severity.systemImage
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(pulse.severity.accentColor)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    timelineMetric(
+                        title: "Pulse score",
+                        value: pulse.score.map { "\($0)/100" } ?? "—",
+                        subtitle: "Merged providers"
+                    )
+                    timelineMetric(
+                        title: "Confidence",
+                        value: "\(Int((pulse.confidence * 100).rounded()))%",
+                        subtitle: "Data quality"
+                    )
+                    timelineMetric(
+                        title: "Updated",
+                        value: pulse.lastUpdated.formatted(date: .omitted, time: .shortened),
+                        subtitle: "Local time"
+                    )
+                }
+
+                if pulse.providers.isEmpty {
+                    Text("No provider data yet.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(pulse.providers) { provider in
+                            HStack(spacing: 8) {
+                                Label(provider.source.title, systemImage: provider.severity.systemImage)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(provider.severity.accentColor)
+
+                                Spacer()
+
+                                if let score = provider.score {
+                                    Text("\(score)/100")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(provider.severity.accentColor)
+                                } else {
+                                    Text("N/A")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Text(providerAgeLabel(provider.capturedAt, stale: provider.stale))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Text(provider.error ?? provider.summary)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
                         }
                     }
                 }
@@ -461,7 +551,11 @@ struct ContentView: View {
     }
 
     private func exportDiagnosticsReport() {
-        let report = monitor.diagnosticsReport(settings: settings)
+        let report = """
+        \(monitor.diagnosticsReport(settings: settings))
+
+        \(iranPulseMonitor.diagnosticsReport())
+        """
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "qatvasl-diagnostics-\(Int(Date().timeIntervalSince1970)).txt"
         panel.allowedContentTypes = [.plainText]
@@ -472,6 +566,22 @@ struct ContentView: View {
         }
 
         try? report.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private func providerAgeLabel(_ date: Date?, stale: Bool) -> String {
+        guard let date else {
+            return stale ? "stale" : "unknown"
+        }
+        let seconds = max(0, Int(Date().timeIntervalSince(date).rounded()))
+        if seconds < 60 {
+            return "\(seconds)s"
+        }
+        let minutes = seconds / 60
+        if minutes < 60 {
+            return "\(minutes)m"
+        }
+        let hours = minutes / 60
+        return "\(hours)h"
     }
 
     @ViewBuilder
