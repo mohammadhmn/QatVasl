@@ -12,6 +12,7 @@ final class NetworkMonitor: ObservableObject {
     @Published private(set) var isChecking = false
     @Published private(set) var latestError: String?
     @Published private(set) var transitionHistory: [StateTransition]
+    @Published private(set) var healthSamples: [HealthSample]
     @Published private(set) var vpnDetected = false
     @Published private(set) var proxyDetected = false
     @Published private(set) var vpnClientLabel: String?
@@ -23,6 +24,7 @@ final class NetworkMonitor: ObservableObject {
 
     private let stateKey = "qatvasl.last.state"
     private let historyKey = "qatvasl.state.history.v1"
+    private let samplesKey = "qatvasl.health.samples.v1"
 
     private var loopTask: Task<Void, Never>?
     private var settingsObserver: AnyCancellable?
@@ -44,6 +46,55 @@ final class NetworkMonitor: ObservableObject {
         RouteSummaryFormatter.format(vpnActive: vpnDetected, proxyActive: proxyDetected)
     }
 
+    var last24hSamples: [HealthSample] {
+        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+        return healthSamples.filter { $0.timestamp >= cutoff }
+    }
+
+    var timelineSummary24h: TimelineSummary {
+        let recent = last24hSamples
+        guard !recent.isEmpty else {
+            return .empty
+        }
+
+        let uptimeCount = recent.filter { $0.state != .offline }.count
+        let uptimePercent = Int((Double(uptimeCount) / Double(recent.count) * 100).rounded())
+        let averageLatencyValues = recent.compactMap(\.averageLatencyMs)
+        let averageLatencyMs = averageLatencyValues.isEmpty
+            ? nil
+            : Int((Double(averageLatencyValues.reduce(0, +)) / Double(averageLatencyValues.count)).rounded())
+        let dropCount = transitionHistory.filter {
+            $0.timestamp >= Date().addingTimeInterval(-24 * 60 * 60) && $0.to == .offline
+        }.count
+
+        let orderedSamples = recent.sorted { $0.timestamp < $1.timestamp }
+        var offlineStart: Date?
+        var recoveries: [TimeInterval] = []
+
+        for sample in orderedSamples {
+            if sample.state == .offline {
+                if offlineStart == nil {
+                    offlineStart = sample.timestamp
+                }
+            } else if let start = offlineStart {
+                recoveries.append(sample.timestamp.timeIntervalSince(start))
+                offlineStart = nil
+            }
+        }
+
+        let meanRecoverySeconds = recoveries.isEmpty
+            ? nil
+            : Int((recoveries.reduce(0, +) / Double(recoveries.count)).rounded())
+
+        return TimelineSummary(
+            uptimePercent: uptimePercent,
+            dropCount: dropCount,
+            averageLatencyMs: averageLatencyMs,
+            meanRecoverySeconds: meanRecoverySeconds,
+            sampleCount: recent.count
+        )
+    }
+
     init(
         settingsStore: SettingsStore,
         defaults: UserDefaults = .standard,
@@ -59,6 +110,7 @@ final class NetworkMonitor: ObservableObject {
         self.diagnosis = .initial
         self.routeIndicators = ConnectivityAssessment.initial.routeIndicators
         self.transitionHistory = Self.loadHistory(from: defaults, key: historyKey)
+        self.healthSamples = Self.loadSamples(from: defaults, key: samplesKey)
 
         settingsObserver = settingsStore.$settings
             .dropFirst()
@@ -87,7 +139,9 @@ final class NetworkMonitor: ObservableObject {
 
     func clearHistory() {
         transitionHistory = []
+        healthSamples = []
         defaults.removeObject(forKey: historyKey)
+        defaults.removeObject(forKey: samplesKey)
     }
 
     private func restartLoop() {
@@ -154,6 +208,7 @@ final class NetworkMonitor: ObservableObject {
         lastSnapshot = snapshot
         lastCheckedAt = snapshot.timestamp
         latestError = snapshot.allResults.first(where: { !$0.ok })?.error
+        appendHealthSample(state: nextState, snapshot: snapshot, timestamp: snapshot.timestamp)
 
         if hasCompletedFirstCheck, previousState != nextState {
             appendTransition(from: previousState, to: nextState, at: snapshot.timestamp)
@@ -242,6 +297,47 @@ final class NetworkMonitor: ObservableObject {
         guard
             let data = defaults.data(forKey: key),
             let decoded = try? JSONDecoder().decode([StateTransition].self, from: data)
+        else {
+            return []
+        }
+        return decoded
+    }
+
+    private func appendHealthSample(state: ConnectivityState, snapshot: ProbeSnapshot, timestamp: Date) {
+        let latencyValues = snapshot.allResults.compactMap { probe in
+            probe.ok ? probe.latencyMs : nil
+        }
+        let averageLatencyMs = latencyValues.isEmpty
+            ? nil
+            : Int((Double(latencyValues.reduce(0, +)) / Double(latencyValues.count)).rounded())
+
+        var updated = healthSamples
+        updated.insert(
+            HealthSample(
+                timestamp: timestamp,
+                state: state,
+                averageLatencyMs: averageLatencyMs,
+                routeLabel: routeModeLabel
+            ),
+            at: 0
+        )
+
+        let cutoff = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        updated.removeAll { $0.timestamp < cutoff }
+        if updated.count > 2_000 {
+            updated.removeLast(updated.count - 2_000)
+        }
+
+        healthSamples = updated
+        if let data = try? JSONEncoder().encode(updated) {
+            defaults.set(data, forKey: samplesKey)
+        }
+    }
+
+    private static func loadSamples(from defaults: UserDefaults, key: String) -> [HealthSample] {
+        guard
+            let data = defaults.data(forKey: key),
+            let decoded = try? JSONDecoder().decode([HealthSample].self, from: data)
         else {
             return []
         }

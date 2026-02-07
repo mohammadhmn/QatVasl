@@ -402,3 +402,41 @@ struct StateTransition: Codable, Equatable, Identifiable {
         "\(from.shortLabel) → \(to.shortLabel)"
     }
 }
+
+struct HealthSample: Codable, Equatable, Identifiable {
+    let id: UUID
+    let timestamp: Date
+    let state: ConnectivityState
+    let averageLatencyMs: Int?
+    let routeLabel: String
+
+    init(
+        id: UUID = UUID(),
+        timestamp: Date,
+        state: ConnectivityState,
+        averageLatencyMs: Int?,
+        routeLabel: String
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.state = state
+        self.averageLatencyMs = averageLatencyMs
+        self.routeLabel = routeLabel
+    }
+}
+
+struct TimelineSummary: Equatable {
+    let uptimePercent: Int
+    let dropCount: Int
+    let averageLatencyMs: Int?
+    let meanRecoverySeconds: Int?
+    let sampleCount: Int
+
+    static let empty = TimelineSummary(
+        uptimePercent: 0,
+        dropCount: 0,
+        averageLatencyMs: nil,
+        meanRecoverySeconds: nil,
+        sampleCount: 0
+    )
+}

@@ -429,7 +429,7 @@ struct ContentView: View {
         GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.40)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Recent Transitions")
+                    Text("24h Timeline")
                         .font(.headline)
 
                     Spacer()
@@ -443,25 +443,99 @@ struct ContentView: View {
                     }
                 }
 
-                if monitor.transitionHistory.isEmpty {
-                    Text("No transitions recorded yet.")
-                        .foregroundStyle(.secondary)
+                let summary = monitor.timelineSummary24h
+                if summary.sampleCount == 0 {
+                    Text("No 24h data yet. Keep QatVasl running to build timeline history.")
                         .font(.callout)
+                        .foregroundStyle(.secondary)
                 } else {
-                    ForEach(monitor.transitionHistory.prefix(6)) { entry in
-                        HStack {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10),
+                        ],
+                        spacing: 10
+                    ) {
+                        timelineMetric(
+                            title: "Uptime",
+                            value: "\(summary.uptimePercent)%",
+                            subtitle: "Last 24h"
+                        )
+                        timelineMetric(
+                            title: "Drops",
+                            value: "\(summary.dropCount)",
+                            subtitle: "To offline"
+                        )
+                        timelineMetric(
+                            title: "Avg latency",
+                            value: summary.averageLatencyMs.map { "\($0) ms" } ?? "—",
+                            subtitle: "Successful probes"
+                        )
+                        timelineMetric(
+                            title: "Recovery",
+                            value: summary.meanRecoverySeconds.map { formatDuration(seconds: $0) } ?? "—",
+                            subtitle: "Mean time"
+                        )
+                    }
+
+                    Divider()
+
+                    Text("Latest checks")
+                        .font(.subheadline.weight(.semibold))
+
+                    ForEach(monitor.last24hSamples.prefix(8)) { sample in
+                        HStack(spacing: 10) {
                             Circle()
-                                .fill(entry.to.accentColor)
+                                .fill(sample.state.accentColor)
                                 .frame(width: 8, height: 8)
 
-                            Text(entry.label)
-                                .font(.callout.weight(.medium))
-                            Spacer()
-                            Text(entry.timestamp.formatted(date: .omitted, time: .shortened))
+                            Text(sample.state.shortLabel)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            Text(sample.routeLabel)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            Text(sample.averageLatencyMs.map { "\($0) ms" } ?? "—")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+
+                            Text(sample.timestamp.formatted(date: .omitted, time: .shortened))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
+                    }
+
+                    Divider()
+
+                    Text("Recent transitions")
+                        .font(.subheadline.weight(.semibold))
+
+                    if monitor.transitionHistory.isEmpty {
+                        Text("No transitions recorded yet.")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    } else {
+                        ForEach(monitor.transitionHistory.prefix(6)) { entry in
+                            HStack {
+                                Circle()
+                                    .fill(entry.to.accentColor)
+                                    .frame(width: 8, height: 8)
+
+                                Text(entry.label)
+                                    .font(.callout.weight(.medium))
+                                Spacer()
+                                Text(entry.timestamp.formatted(date: .omitted, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                        }
                     }
                 }
             }
@@ -500,5 +574,36 @@ struct ContentView: View {
 
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(payload, forType: .string)
+    }
+
+    @ViewBuilder
+    private func timelineMetric(title: String, value: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.callout.weight(.bold))
+
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular.tint(.white.opacity(0.04)), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func formatDuration(seconds: Int) -> String {
+        if seconds < 60 {
+            return "\(seconds)s"
+        }
+        let minutes = seconds / 60
+        let rem = seconds % 60
+        if rem == 0 {
+            return "\(minutes)m"
+        }
+        return "\(minutes)m \(rem)s"
     }
 }
