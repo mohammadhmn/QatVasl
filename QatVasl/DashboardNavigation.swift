@@ -3,6 +3,7 @@ import SwiftUI
 
 enum DashboardSection: String, CaseIterable, Identifiable {
     case live
+    case pulse
     case services
     case history
     case settings
@@ -13,6 +14,8 @@ enum DashboardSection: String, CaseIterable, Identifiable {
         switch self {
         case .live:
             return "Live"
+        case .pulse:
+            return "Pulse"
         case .services:
             return "Services"
         case .history:
@@ -26,6 +29,8 @@ enum DashboardSection: String, CaseIterable, Identifiable {
         switch self {
         case .live:
             return "Current health, route, probes, and next actions."
+        case .pulse:
+            return "Iran Pulse scoring, confidence, and provider-level calculations."
         case .services:
             return "Critical services availability across direct and proxy paths."
         case .history:
@@ -39,6 +44,8 @@ enum DashboardSection: String, CaseIterable, Identifiable {
         switch self {
         case .live:
             return "dot.radiowaves.left.and.right"
+        case .pulse:
+            return "waveform.path.ecg"
         case .services:
             return "square.grid.3x2.fill"
         case .history:
@@ -52,6 +59,8 @@ enum DashboardSection: String, CaseIterable, Identifiable {
         switch self {
         case .live:
             return .cyan
+        case .pulse:
+            return .orange
         case .services:
             return .mint
         case .history:

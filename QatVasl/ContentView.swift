@@ -114,6 +114,8 @@ struct ContentView: View {
                         diagnosisSection
                         iranPulseSection
                         probesSection
+                    case .pulse:
+                        pulseInsightsSection
                     case .services:
                         servicesSection
                     case .history:
@@ -362,6 +364,151 @@ struct ContentView: View {
         }
     }
 
+    private var pulseInsightsSection: some View {
+        let pulse = iranPulseMonitor.snapshot
+        return VStack(alignment: .leading, spacing: 12) {
+            GlassCard(cornerRadius: 18, tint: .orange.opacity(0.14)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Current Iran Pulse")
+                        .font(.headline)
+
+                    HStack(spacing: 10) {
+                        timelineMetric(
+                            title: "Pulse score",
+                            value: pulse.score.map { "\($0)/100" } ?? "—",
+                            subtitle: "Merged result"
+                        )
+                        timelineMetric(
+                            title: "Severity",
+                            value: pulse.severity.title,
+                            subtitle: "Score band"
+                        )
+                        timelineMetric(
+                            title: "Confidence",
+                            value: "\(Int((pulse.confidence * 100).rounded()))%",
+                            subtitle: "Data trust level"
+                        )
+                        timelineMetric(
+                            title: "Updated",
+                            value: pulse.lastUpdated.formatted(date: .omitted, time: .shortened),
+                            subtitle: "Local time"
+                        )
+                    }
+
+                    Text(pulse.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            GlassCard(cornerRadius: 18, tint: .orange.opacity(0.10)) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("How the merged score is calculated")
+                        .font(.headline)
+
+                    Text("1) Provider scores are normalized to 0–100.")
+                        .font(.callout)
+                    Text("2) Weighted merge: Vanillapp 70%, OONI 30%.")
+                        .font(.callout)
+                    Text("3) Confidence affects effective provider influence.")
+                        .font(.callout)
+                    Text("4) Staleness penalty: -8 (some stale), -18 (all stale).")
+                        .font(.callout)
+                    Text("5) Severity bands: Normal ≥80, Degraded 50–79, Severe <50.")
+                        .font(.callout)
+
+                    Divider()
+
+                    Text("What each number means")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Pulse score: country-level internet health estimate.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Confidence: reliability of currently available source data.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Updated: last local merge time in QatVasl.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if pulse.providers.isEmpty {
+                GlassCard(cornerRadius: 18, tint: .gray.opacity(0.12)) {
+                    Text("No provider data yet. Enable providers in Settings → National Monitoring.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(pulse.providers) { provider in
+                    GlassCard(cornerRadius: 18, tint: provider.severity.accentColor.opacity(0.10)) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Label(provider.source.title, systemImage: provider.severity.systemImage)
+                                    .font(.headline)
+                                    .foregroundStyle(provider.severity.accentColor)
+                                Spacer()
+                                Text(provider.score.map { "\($0)/100" } ?? "N/A")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+
+                            Text(provider.summary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text(providerFormula(for: provider.source))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            HStack(spacing: 10) {
+                                timelineMetric(
+                                    title: "Severity",
+                                    value: provider.severity.title,
+                                    subtitle: provider.stale ? "Stale data" : "Fresh data"
+                                )
+                                timelineMetric(
+                                    title: "Confidence",
+                                    value: "\(Int((provider.confidence * 100).rounded()))%",
+                                    subtitle: "Provider confidence"
+                                )
+                                timelineMetric(
+                                    title: "Age",
+                                    value: providerAgeLabel(provider.capturedAt, stale: provider.stale),
+                                    subtitle: "Source freshness"
+                                )
+                            }
+
+                            if !provider.details.isEmpty {
+                                Divider()
+                                Text("Current calculation inputs")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                ForEach(Array(sortedProviderDetails(provider.details).enumerated()), id: \.offset) { _, detail in
+                                    HStack {
+                                        Text(detail.label)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Text(detail.value)
+                                            .font(.caption2.weight(.semibold))
+                                    }
+                                }
+                            }
+
+                            if let error = provider.error {
+                                Divider()
+                                Text("Error: \(error)")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var probesSection: some View {
         GlassCard(cornerRadius: 18, tint: .mint.opacity(0.14)) {
             VStack(alignment: .leading, spacing: 10) {
@@ -582,6 +729,56 @@ struct ContentView: View {
         }
         let hours = minutes / 60
         return "\(hours)h"
+    }
+
+    private func providerFormula(for source: IranPulseSource) -> String {
+        switch source {
+        case .vanillapp:
+            return "Formula: score = ((4 - avg_level)/4 * 100) - (degraded_ratio * 20). Degraded level means status level ≥ 2."
+        case .ooni:
+            return "Formula: blocked_ratio = min(1, (1.3×confirmed + 1.0×anomaly + 0.9×failure) / sample_count), then score = (1 - blocked_ratio) * 100."
+        }
+    }
+
+    private func sortedProviderDetails(_ details: [String: String]) -> [(label: String, value: String)] {
+        details
+            .map { key, value in
+                (label: providerDetailLabel(for: key), value: value)
+            }
+            .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+    }
+
+    private func providerDetailLabel(for key: String) -> String {
+        switch key {
+        case "average_latency":
+            return "Average latency"
+        case "average_level":
+            return "Average level"
+        case "age_seconds":
+            return "Age (seconds)"
+        case "blocked_ratio":
+            return "Blocked ratio"
+        case "captured_at":
+            return "Captured at"
+        case "datacenters_total":
+            return "Datacenters total"
+        case "degraded_nodes":
+            return "Degraded nodes"
+        case "failure_count":
+            return "Failure count"
+        case "anomaly_count":
+            return "Anomaly count"
+        case "confirmed_count":
+            return "Confirmed blocked count"
+        case "sample_count":
+            return "Sample count"
+        case "status_coverage":
+            return "Status coverage"
+        case "newest_sample_at":
+            return "Newest sample at"
+        default:
+            return key.replacingOccurrences(of: "_", with: " ").capitalized
+        }
     }
 
     @ViewBuilder
