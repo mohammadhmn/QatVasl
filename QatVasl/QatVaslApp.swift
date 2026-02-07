@@ -53,6 +53,7 @@ struct QatVaslApp: App {
     @NSApplicationDelegateAdaptor(QatVaslAppDelegate.self) private var appDelegate
     @StateObject private var settingsStore: SettingsStore
     @StateObject private var monitor: NetworkMonitor
+    @StateObject private var navigationStore = DashboardNavigationStore()
 
     init() {
         let store = SettingsStore()
@@ -65,6 +66,7 @@ struct QatVaslApp: App {
             ContentView()
                 .environmentObject(settingsStore)
                 .environmentObject(monitor)
+                .environmentObject(navigationStore)
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
@@ -74,6 +76,7 @@ struct QatVaslApp: App {
             MenuBarContentView()
                 .environmentObject(settingsStore)
                 .environmentObject(monitor)
+                .environmentObject(navigationStore)
                 .preferredColorScheme(.dark)
         }
         label: {
@@ -88,12 +91,5 @@ struct QatVaslApp: App {
             .accessibilityLabel(monitor.displayState.menuTitle)
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-                .environmentObject(settingsStore)
-                .environmentObject(monitor)
-                .preferredColorScheme(.dark)
-        }
     }
 }

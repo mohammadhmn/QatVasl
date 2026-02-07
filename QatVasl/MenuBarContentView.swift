@@ -4,11 +4,21 @@ import SwiftUI
 struct MenuBarContentView: View {
     @EnvironmentObject private var monitor: NetworkMonitor
     @EnvironmentObject private var settingsStore: SettingsStore
-    @Environment(\.openSettings) private var openSettings
+    @EnvironmentObject private var navigationStore: DashboardNavigationStore
     @Environment(\.openWindow) private var openWindow
 
+    private var quickProbes: [ProbeResult] {
+        guard let snapshot = monitor.lastSnapshot else {
+            return []
+        }
+
+        let order: [ProbeKind] = [.domestic, .global, .restrictedViaProxy]
+        let map = Dictionary(uniqueKeysWithValues: snapshot.allResults.map { ($0.kind, $0) })
+        return order.compactMap { map[$0] }
+    }
+
     var body: some View {
-        GlassCard(cornerRadius: 16, tint: .indigo.opacity(0.40)) {
+        GlassCard(cornerRadius: 16, tint: .indigo.opacity(0.26)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     StatusPill(state: monitor.displayState)
@@ -19,107 +29,88 @@ struct MenuBarContentView: View {
                     }
                 }
 
-                Text(monitor.displayState.detail)
-                    .font(.callout.weight(.medium))
-
                 Text(monitor.diagnosis.title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(2)
 
-                Divider()
-
-                if let snapshot = monitor.lastSnapshot {
-                    ForEach(snapshot.allResults) { result in
-                        HStack {
-                            Label(result.name, systemImage: result.systemImage)
-                                .font(.callout)
-                            Spacer()
-                            Text(result.summary)
-                                .font(.caption)
-                                .foregroundStyle(result.ok ? .green : .secondary)
-                        }
-                    }
-                } else {
-                    Text("Waiting for first probe...")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                Divider()
-
-                HStack(spacing: 8) {
-                    ForEach(monitor.routeIndicators) { indicator in
-                        RouteChip(indicator: indicator)
-                    }
-                }
-
-                Divider()
-
-                if let activeProfile = settingsStore.settings.activeProfile {
-                    Text("ISP: \(activeProfile.name)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                Text("Proxy: \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text(monitor.routeModeLabel)
+                Text("\(monitor.routeModeLabel) · Proxy \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                if let vpnClientLabel = monitor.vpnClientLabel {
-                    Text("Client: \(vpnClientLabel)")
+                if let activeProfile = settingsStore.settings.activeProfile {
+                    Text("ISP \(activeProfile.name)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
-                if !monitor.criticalServiceResults.isEmpty {
+                Divider()
+
+                if quickProbes.isEmpty {
+                    Text("Running first probe...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(quickProbes) { result in
+                        HStack {
+                            Label(result.name, systemImage: result.systemImage)
+                                .font(.caption)
+                            Spacer()
+                            Text(result.summary)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(result.ok ? .green : .secondary)
+                        }
+                    }
+                }
+
+                if !monitor.transitionHistory.isEmpty {
                     Divider()
 
-                    Text("Critical services")
+                    Text("Recent")
                         .font(.caption.weight(.semibold))
 
-                    ForEach(monitor.criticalServiceResults.prefix(3)) { service in
+                    ForEach(monitor.transitionHistory.prefix(2)) { transition in
                         HStack {
-                            Text(service.name)
+                            Circle()
+                                .fill(transition.to.accentColor)
+                                .frame(width: 7, height: 7)
+                            Text(transition.label)
                                 .font(.caption2)
+                                .foregroundStyle(.secondary)
                             Spacer()
-                            Image(systemName: service.overallOk ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(service.overallOk ? .green : .orange)
+                            Text(transition.timestamp.formatted(date: .omitted, time: .shortened))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
 
                 HStack {
-                    Button("Refresh") { monitor.refreshNow() }
-                        .buttonStyle(.glass)
-                        .disabled(monitor.isChecking)
-
-                    Button("Settings") {
-                        presentSettings()
+                    Button("Refresh") {
+                        monitor.refreshNow()
                     }
                     .buttonStyle(.glass)
+                    .disabled(monitor.isChecking)
 
                     Button("Dashboard") {
-                        NSApp.setActivationPolicy(.regular)
-                        openWindow(id: "dashboard")
-                        NSApp.activate(ignoringOtherApps: true)
+                        openDashboard(section: .live)
                     }
                     .buttonStyle(.glassProminent)
+
+                    Button("Settings") {
+                        openDashboard(section: .settings)
+                    }
+                    .buttonStyle(.glass)
                 }
             }
         }
         .padding(14)
-        .frame(width: 360)
+        .frame(width: 350)
     }
 
-    private func presentSettings() {
+    private func openDashboard(section: DashboardSection) {
+        navigationStore.open(section)
         NSApp.setActivationPolicy(.regular)
-        openSettings()
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        openWindow(id: "dashboard")
         NSApp.activate(ignoringOtherApps: true)
     }
 }
