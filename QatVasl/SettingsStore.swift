@@ -14,9 +14,9 @@ final class SettingsStore: ObservableObject {
     private var persistenceCancellable: AnyCancellable?
     private let ispDetector: ISPDetector
 
-    init(defaults: UserDefaults = .standard, ispDetector: ISPDetector = ISPDetector()) {
+    init(defaults: UserDefaults = .standard, ispDetector: ISPDetector? = nil) {
         self.defaults = defaults
-        self.ispDetector = ispDetector
+        self.ispDetector = ispDetector ?? ISPDetector()
         if
             let data = defaults.data(forKey: storageKey),
             let decoded = try? JSONDecoder().decode(MonitorSettings.self, from: data)
