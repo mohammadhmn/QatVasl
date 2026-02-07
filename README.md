@@ -103,6 +103,17 @@ Recommended order for new contributors:
 4. `docs/07-build-run-package-playbook.md`
 5. `docs/08-troubleshooting-and-faq.md`
 
+## Installing Release Builds
+
+If macOS reports the app is damaged, follow `INSTALL_UNSIGNED.md`.
+
+Quick fix:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/QatVasl.app
+open /Applications/QatVasl.app
+```
+
 ## Contributing
 
 Contributions are welcome. Please read `CONTRIBUTING.md` first.

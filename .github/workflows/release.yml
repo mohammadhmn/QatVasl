@@ -62,6 +62,6 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           files: build/dist/QatVasl.dmg
-          generate_release_notes: true
+          body_path: .github/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
