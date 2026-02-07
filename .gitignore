@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Xcode user-specific files
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Build artifacts
+build/
+DerivedData/
+*.dmg
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local editor/IDE
+.vscode/
+.idea/
