@@ -373,7 +373,7 @@ final class NetworkMonitor: ObservableObject {
         guard let rawState = defaults.string(forKey: key) else {
             return .checking
         }
-        return ConnectivityState.fromStoredRawValue(rawState) ?? .checking
+        return ConnectivityState(rawValue: rawState) ?? .checking
     }
 
     private func shouldSendNotification(at date: Date, settings: MonitorSettings) -> Bool {

@@ -6,34 +6,6 @@ enum ConnectivityState: String, Codable, CaseIterable {
     case degraded
     case usable
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let rawValue = try container.decode(String.self)
-        self = Self.fromStoredRawValue(rawValue) ?? .offline
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
-    }
-
-    static func fromStoredRawValue(_ rawValue: String) -> ConnectivityState? {
-        if let state = ConnectivityState(rawValue: rawValue) {
-            return state
-        }
-
-        switch rawValue {
-        case "openInternet", "vpnOK", "vpnOrProxyActive":
-            return .usable
-        case "domesticOnly", "globalLimited":
-            return .degraded
-        case "offline":
-            return .offline
-        default:
-            return nil
-        }
-    }
-
     var shortLabel: String {
         switch self {
         case .checking:
