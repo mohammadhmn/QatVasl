@@ -13,18 +13,18 @@ struct GlassCard<Content: View>: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        let glass = tint.map { Glass.regular.tint($0.opacity(0.12)) } ?? .regular
+        let glass = tint.map { Glass.regular.tint($0.opacity(0.10)) } ?? .regular
 
         content
-            .padding(16)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(glass, in: shape)
             .clipShape(shape)
             .overlay(
                 shape
-                    .strokeBorder(.white.opacity(0.06), lineWidth: 0.8)
+                    .strokeBorder(.white.opacity(0.05), lineWidth: 0.7)
             )
-            .shadow(color: .black.opacity(0.18), radius: 14, y: 7)
+            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
     }
 }
 
@@ -38,14 +38,14 @@ struct StatusPill: View {
                 .frame(width: 9, height: 9)
 
             Text(state.shortLabel)
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .glassEffect(.regular.tint(color.opacity(0.14)), in: Capsule(style: .continuous))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .glassEffect(.regular.tint(color.opacity(0.12)), in: Capsule(style: .continuous))
         .overlay(
             Capsule(style: .continuous)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 0.8)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 0.7)
         )
     }
 
@@ -76,13 +76,14 @@ struct RouteChip: View {
 
     var body: some View {
         Label(indicator.kind.title, systemImage: indicator.kind.systemImage)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .glassEffect(.regular.tint(chipColor.opacity(indicator.isActive ? 0.18 : 0.06)), in: Capsule(style: .continuous))
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .glassEffect(.regular.tint(chipColor.opacity(indicator.isActive ? 0.14 : 0.04)), in: Capsule(style: .continuous))
             .overlay(
                 Capsule(style: .continuous)
-                    .strokeBorder(indicator.isActive ? chipColor.opacity(0.5) : .white.opacity(0.08), lineWidth: 0.9)
+                    .strokeBorder(indicator.isActive ? chipColor.opacity(0.42) : .white.opacity(0.08), lineWidth: 0.8)
             )
             .foregroundStyle(indicator.isActive ? chipColor : .secondary)
     }
@@ -104,21 +105,21 @@ struct ProbeMetricCard: View {
 
     var body: some View {
         GlassCard(cornerRadius: 14, tint: result.ok ? .green : .orange) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Image(systemName: result.systemImage)
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(result.ok ? .green : .orange)
                     Text(result.name)
-                        .font(.headline.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                 }
 
                 Text(result.summary)
-                    .font(.callout.weight(.medium))
+                    .font(.callout.weight(.semibold))
 
                 Text(result.target)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

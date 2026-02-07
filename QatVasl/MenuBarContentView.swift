@@ -18,8 +18,8 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        GlassCard(cornerRadius: 16, tint: .indigo.opacity(0.26)) {
-            VStack(alignment: .leading, spacing: 10) {
+        GlassCard(cornerRadius: 16, tint: .indigo.opacity(0.18)) {
+            VStack(alignment: .leading, spacing: 9) {
                 HStack {
                     StatusPill(state: monitor.displayState)
                     Spacer()
@@ -84,7 +84,7 @@ struct MenuBarContentView: View {
                     }
                 }
 
-                HStack {
+                HStack(spacing: 8) {
                     Button("Refresh") {
                         monitor.refreshNow()
                     }
@@ -104,7 +104,7 @@ struct MenuBarContentView: View {
             }
         }
         .padding(14)
-        .frame(width: 350)
+        .frame(width: 342)
     }
 
     private func openDashboard(section: DashboardSection) {

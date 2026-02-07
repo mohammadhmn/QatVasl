@@ -26,8 +26,8 @@ struct SettingsView: View {
     }
 
     private var settingsContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.18)) {
+        VStack(alignment: .leading, spacing: 12) {
+            GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.14)) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Settings")
                         .font(.headline)
@@ -46,7 +46,7 @@ struct SettingsView: View {
     }
 
     private var profilesAndPresetsCard: some View {
-        GlassCard(cornerRadius: 18, tint: .blue.opacity(0.18)) {
+        GlassCard(cornerRadius: 18, tint: .blue.opacity(0.14)) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Profiles & Presets")
                     .font(.headline)
@@ -154,7 +154,7 @@ struct SettingsView: View {
     }
 
     private var monitoringAndTargetsCard: some View {
-        GlassCard(cornerRadius: 18, tint: .mint.opacity(0.16)) {
+        GlassCard(cornerRadius: 18, tint: .mint.opacity(0.13)) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Monitoring & Targets")
                     .font(.headline)
@@ -192,7 +192,7 @@ struct SettingsView: View {
     }
 
     private var routesAndServicesCard: some View {
-        GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.15)) {
+        GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.12)) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Routes & Critical Services")
                     .font(.headline)
@@ -299,7 +299,7 @@ struct SettingsView: View {
     }
 
     private var notificationsAndSystemCard: some View {
-        GlassCard(cornerRadius: 18, tint: .purple.opacity(0.16)) {
+        GlassCard(cornerRadius: 18, tint: .purple.opacity(0.13)) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Notifications & System")
                     .font(.headline)

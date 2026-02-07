@@ -30,7 +30,7 @@ struct ContentView: View {
 
     private var sidebar: some View {
         VStack(spacing: 12) {
-            GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.24)) {
+            GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.18)) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
                         Image(systemName: "bolt.horizontal.icloud.fill")
@@ -63,7 +63,7 @@ struct ContentView: View {
         .padding(.top, 12)
         .padding(.bottom, 10)
         .safeAreaInset(edge: .bottom) {
-            GlassCard(cornerRadius: 14, tint: monitor.displayState.accentColor.opacity(0.24)) {
+            GlassCard(cornerRadius: 14, tint: monitor.displayState.accentColor.opacity(0.18)) {
                 HStack(spacing: 10) {
                     StatusPill(state: monitor.displayState)
                     Spacer()
@@ -96,7 +96,7 @@ struct ContentView: View {
             background
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     pageHeader
 
                     switch navigationStore.selectedSection {
@@ -112,7 +112,7 @@ struct ContentView: View {
                         settingsSection
                     }
                 }
-                .padding(20)
+                .padding(18)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -133,7 +133,7 @@ struct ContentView: View {
 
     private var pageHeader: some View {
         let selected = navigationStore.selectedSection
-        return GlassCard(cornerRadius: 18, tint: .blue.opacity(0.22)) {
+        return GlassCard(cornerRadius: 18, tint: .blue.opacity(0.18)) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(selected.title)
@@ -164,7 +164,7 @@ struct ContentView: View {
     }
 
     private var liveStatusSection: some View {
-        GlassCard(cornerRadius: 22, tint: monitor.displayState.accentColor.opacity(0.26)) {
+        GlassCard(cornerRadius: 22, tint: monitor.displayState.accentColor.opacity(0.20)) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     HStack(spacing: 12) {
@@ -210,7 +210,7 @@ struct ContentView: View {
     }
 
     private var diagnosisSection: some View {
-        GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.20)) {
+        GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.16)) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Diagnosis")
                     .font(.headline)
@@ -240,44 +240,32 @@ struct ContentView: View {
                     }
                 }
 
-                HStack {
-                    Button {
-                        monitor.refreshNow()
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+                ViewThatFits {
+                    HStack(spacing: 8) {
+                        refreshButton
+                        copyButton
+                        exportButton
+                        settingsButton
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.glassProminent)
-                    .disabled(monitor.isChecking)
 
-                    Button {
-                        copyDiagnosisToClipboard()
-                    } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            refreshButton
+                            copyButton
+                        }
+                        HStack(spacing: 8) {
+                            exportButton
+                            settingsButton
+                        }
                     }
-                    .buttonStyle(.glass)
-
-                    Button {
-                        exportDiagnosticsReport()
-                    } label: {
-                        Label("Export report", systemImage: "square.and.arrow.down")
-                    }
-                    .buttonStyle(.glass)
-
-                    Button {
-                        navigationStore.open(.settings)
-                    } label: {
-                        Label("Settings", systemImage: "gearshape.fill")
-                    }
-                    .buttonStyle(.glass)
-
-                    Spacer()
                 }
             }
         }
     }
 
     private var probesSection: some View {
-        GlassCard(cornerRadius: 18, tint: .mint.opacity(0.18)) {
+        GlassCard(cornerRadius: 18, tint: .mint.opacity(0.14)) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Connectivity Probes")
                     .font(.headline)
@@ -304,7 +292,7 @@ struct ContentView: View {
     }
 
     private var servicesSection: some View {
-        GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.16)) {
+        GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.12)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Critical Services")
@@ -359,7 +347,7 @@ struct ContentView: View {
     }
 
     private var historySection: some View {
-        GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.16)) {
+        GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.12)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("History")
@@ -503,9 +491,46 @@ struct ContentView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .padding(10)
+        .padding(9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular.tint(.white.opacity(0.03)), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var refreshButton: some View {
+        Button {
+            monitor.refreshNow()
+        } label: {
+            Label("Refresh", systemImage: "arrow.clockwise")
+        }
+        .buttonStyle(.glassProminent)
+        .disabled(monitor.isChecking)
+    }
+
+    private var copyButton: some View {
+        Button {
+            copyDiagnosisToClipboard()
+        } label: {
+            Label("Copy", systemImage: "doc.on.doc")
+        }
+        .buttonStyle(.glass)
+    }
+
+    private var exportButton: some View {
+        Button {
+            exportDiagnosticsReport()
+        } label: {
+            Label("Export report", systemImage: "square.and.arrow.down")
+        }
+        .buttonStyle(.glass)
+    }
+
+    private var settingsButton: some View {
+        Button {
+            navigationStore.open(.settings)
+        } label: {
+            Label("Settings", systemImage: "gearshape.fill")
+        }
+        .buttonStyle(.glass)
     }
 
     private func formatDuration(seconds: Int) -> String {

@@ -48,18 +48,6 @@ enum DashboardSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var tint: String {
-        switch self {
-        case .live:
-            return "cyan"
-        case .services:
-            return "mint"
-        case .history:
-            return "indigo"
-        case .settings:
-            return "purple"
-        }
-    }
 }
 
 @MainActor
