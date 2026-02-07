@@ -247,26 +247,36 @@ final class NetworkMonitor: ObservableObject {
     }
 
     private nonisolated static func detectRouteContext() -> RouteContext {
-        let tunnelActive = detectSystemTunnelActive()
+        let connectedServiceName = detectConnectedNetworkServiceName()
+        let tunnelViaDefaultRoute = detectTunnelDefaultRouteActive()
+        let tunnelActive = connectedServiceName != nil || tunnelViaDefaultRoute
         let systemProxyActive = detectSystemProxyActive()
 
         return RouteContext(
             tunnelActive: tunnelActive,
             systemProxyActive: systemProxyActive,
-            vpnClientName: detectVpnClientName(tunnelActive: tunnelActive, systemProxyActive: systemProxyActive)
+            vpnClientName: detectVpnClientName(
+                tunnelActive: tunnelActive,
+                systemProxyActive: systemProxyActive,
+                connectedServiceName: connectedServiceName
+            )
         )
     }
 
-    private nonisolated static func detectVpnClientName(tunnelActive: Bool, systemProxyActive: Bool) -> String? {
+    private nonisolated static func detectVpnClientName(
+        tunnelActive: Bool,
+        systemProxyActive: Bool,
+        connectedServiceName: String?
+    ) -> String? {
         guard tunnelActive || systemProxyActive else {
             return nil
         }
 
-        if let serviceName = detectConnectedNetworkServiceName() {
-            return serviceName
+        if let connectedServiceName {
+            return connectedServiceName
         }
 
-        if let processName = detectLikelyVpnProcessName() {
+        if tunnelActive, let processName = detectLikelyVpnProcessName() {
             return processName
         }
 
@@ -277,32 +287,52 @@ final class NetworkMonitor: ObservableObject {
         return "Unknown proxy client"
     }
 
-    private nonisolated static func detectSystemTunnelActive() -> Bool {
-        var interfaces: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&interfaces) == 0, let first = interfaces else {
-            return false
+    private nonisolated static func detectTunnelDefaultRouteActive() -> Bool {
+        if
+            let defaultIPv4Interface = detectDefaultRouteInterface(arguments: ["-n", "get", "default"]),
+            isTunnelInterfaceName(defaultIPv4Interface)
+        {
+            return true
         }
-        defer { freeifaddrs(interfaces) }
 
-        var current: UnsafeMutablePointer<ifaddrs>? = first
-        while let interface = current?.pointee {
-            let flags = Int32(interface.ifa_flags)
-            let isUp = (flags & Int32(IFF_UP | IFF_RUNNING)) == Int32(IFF_UP | IFF_RUNNING)
-            if isUp, let cName = interface.ifa_name {
-                let name = String(cString: cName)
-                if
-                    name.hasPrefix("utun") ||
-                    name.hasPrefix("tun") ||
-                    name.hasPrefix("tap") ||
-                    name.hasPrefix("ppp")
-                {
-                    return true
-                }
-            }
-            current = interface.ifa_next
+        if
+            let defaultIPv6Interface = detectDefaultRouteInterface(arguments: ["-n", "get", "-inet6", "default"]),
+            isTunnelInterfaceName(defaultIPv6Interface)
+        {
+            return true
         }
 
         return false
+    }
+
+    private nonisolated static func detectDefaultRouteInterface(arguments: [String]) -> String? {
+        guard let output = runCommand("/sbin/route", arguments: arguments) else {
+            return nil
+        }
+
+        let lines = output.split(whereSeparator: \.isNewline).map(String.init)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("interface:") else {
+                continue
+            }
+
+            let interfaceName = trimmed
+                .replacingOccurrences(of: "interface:", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !interfaceName.isEmpty {
+                return interfaceName
+            }
+        }
+
+        return nil
+    }
+
+    private nonisolated static func isTunnelInterfaceName(_ interfaceName: String) -> Bool {
+        interfaceName.hasPrefix("utun") ||
+            interfaceName.hasPrefix("tun") ||
+            interfaceName.hasPrefix("tap") ||
+            interfaceName.hasPrefix("ppp")
     }
 
     private nonisolated static func detectSystemProxyActive() -> Bool {
@@ -313,20 +343,34 @@ final class NetworkMonitor: ObservableObject {
             return false
         }
 
-        let keys: [String] = [
-            kCFNetworkProxiesHTTPEnable as String,
-            kCFNetworkProxiesHTTPSEnable as String,
-            kCFNetworkProxiesSOCKSEnable as String,
-            kCFNetworkProxiesProxyAutoConfigEnable as String,
-            kCFNetworkProxiesProxyAutoDiscoveryEnable as String,
-        ]
-
-        return keys.contains { key in
-            guard let value = settings[key] as? NSNumber else {
-                return false
-            }
-            return value.boolValue
+        let httpEnabled = (settings[kCFNetworkProxiesHTTPEnable as String] as? NSNumber)?.boolValue == true
+        if
+            httpEnabled,
+            let host = settings[kCFNetworkProxiesHTTPProxy as String] as? String,
+            !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return true
         }
+
+        let httpsEnabled = (settings[kCFNetworkProxiesHTTPSEnable as String] as? NSNumber)?.boolValue == true
+        if
+            httpsEnabled,
+            let host = settings[kCFNetworkProxiesHTTPSProxy as String] as? String,
+            !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return true
+        }
+
+        let socksEnabled = (settings[kCFNetworkProxiesSOCKSEnable as String] as? NSNumber)?.boolValue == true
+        if
+            socksEnabled,
+            let host = settings[kCFNetworkProxiesSOCKSProxy as String] as? String,
+            !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return true
+        }
+
+        return false
     }
 
     private nonisolated static func detectConnectedNetworkServiceName() -> String? {
