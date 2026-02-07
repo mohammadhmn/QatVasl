@@ -16,7 +16,7 @@ enum ConnectivityStateEvaluator {
                     state: .usable,
                     diagnosis: ConnectivityDiagnosis(
                         title: "VPN route is active",
-                        explanation: "Traffic is currently routed through a system VPN/TUN path and restricted-service checks are passing.",
+                        explanation: "Traffic is currently routed through a system VPN/TUN path and Blocked Service checks are passing.",
                         actions: [
                             "Keep VPN connected if your apps are working.",
                             "Use Refresh Now after VPN node/profile changes.",
@@ -33,11 +33,11 @@ enum ConnectivityStateEvaluator {
                     state: .vpnIssue,
                     diagnosis: ConnectivityDiagnosis(
                         title: "VPN tunnel is up, but blocked routes fail",
-                        explanation: "TUN is active and basic internet may still work, but restricted-service checks fail through the current VPN path.",
+                        explanation: "TUN is active and basic internet may still work, but Blocked Service checks fail through the current VPN path.",
                         actions: [
                             "Reconnect VPN and rotate to another node/profile.",
                             "If using Happ/OpenVPN TUN, restart the tunnel service.",
-                            "Run Refresh Now and confirm restricted-service probe recovery.",
+                            "Run Refresh Now and confirm Blocked Service probe recovery.",
                         ]
                     ),
                     routeIndicators: routeIndicators,
@@ -66,7 +66,7 @@ enum ConnectivityStateEvaluator {
                 state: .usable,
                 diagnosis: ConnectivityDiagnosis(
                     title: "Direct path is open",
-                    explanation: "Blocked-service probe succeeds without VPN or proxy. Internet is currently usable directly.",
+                    explanation: "Blocked Service (Direct) probe succeeds without VPN or proxy. Internet is currently usable directly.",
                     actions: [
                         "Use direct connection while this state remains stable.",
                         "Keep QatVasl running to detect drops quickly.",
@@ -82,7 +82,7 @@ enum ConnectivityStateEvaluator {
                 state: .usable,
                 diagnosis: ConnectivityDiagnosis(
                     title: "Proxy path is working",
-                    explanation: "Direct blocked-service access fails, but the configured proxy path succeeds.",
+                    explanation: "Blocked Service (Direct) fails, but Blocked Service (Proxy) succeeds.",
                     actions: [
                         "Keep current proxy endpoint active.",
                         "If quality drops, rotate proxy/V2Ray config first.",
@@ -98,10 +98,10 @@ enum ConnectivityStateEvaluator {
             return ConnectivityAssessment(
                 state: .degraded,
                 diagnosis: ConnectivityDiagnosis(
-                    title: "General internet works, restricted services fail",
-                    explanation: "Domestic and global probes are reachable, but blocked-service probes fail.",
+                    title: "General internet works, blocked services fail",
+                    explanation: "Domestic and Global probes are reachable, but Blocked Service probes fail.",
                     actions: [
-                        "Rotate VPN/proxy profile to restore blocked-service access.",
+                        "Rotate VPN/proxy profile to restore Blocked Service access.",
                         "Verify proxy host/port and local client status.",
                         "Use Refresh Now after each change.",
                     ]
@@ -133,7 +133,7 @@ enum ConnectivityStateEvaluator {
                 state: .degraded,
                 diagnosis: ConnectivityDiagnosis(
                     title: "Proxy endpoint reachable but unusable",
-                    explanation: "The proxy port responds, but blocked-service traffic still fails through it.",
+                    explanation: "The proxy port responds, but Blocked Service traffic still fails through it.",
                     actions: [
                         "Rotate to a different proxy/V2Ray node.",
                         "Verify protocol type and port match client settings.",
@@ -149,7 +149,7 @@ enum ConnectivityStateEvaluator {
             state: .offline,
             diagnosis: ConnectivityDiagnosis(
                 title: "No usable route detected",
-                explanation: "Domestic, global, and blocked-service checks all fail from the current direct path.",
+                explanation: "Domestic, Global, and Blocked Service checks all fail from the current direct path.",
                 actions: [
                     "Switch ISP and test again.",
                     "Connect VPN or start proxy client.",
