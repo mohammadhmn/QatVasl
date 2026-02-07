@@ -36,7 +36,7 @@ open QatVasl.xcodeproj
 What should happen:
 
 - App launches.
-- A new menu bar item appears (status dot + short label like `OFF`, `VPN`, `TUN`).
+- A new menu bar item appears (status dot + short label like `OFF`, `VPN`, `OPEN`).
 - Dashboard window opens.
 
 ## 4) Daily Run (Terminal Way)
@@ -61,7 +61,7 @@ Click menu bar item to open quick panel:
 
 - Current state summary
 - Probe results
-- Route mode (`Direct path`, `TUN active`, etc.)
+- Route mode (`Direct path`, `VPN active`, `PROXY active`, etc.)
 - Detected VPN client label (best effort)
 - Buttons: `Refresh`, `Settings`, `Dashboard`
 
@@ -117,7 +117,7 @@ Then:
 - `IR ONLY`: domestic route works only.
 - `LIMITED`: global works, blocked service fails.
 - `VPN OK`: blocked route works through proxy.
-- `TUN ON`: system tunnel/proxy active; direct verdict paused.
+- `VPN/PROXY`: system VPN/proxy active; direct verdict paused.
 - `OPEN`: blocked service works directly.
 
 ## 9) Where Settings Are Stored

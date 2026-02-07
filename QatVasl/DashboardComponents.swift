@@ -11,7 +11,7 @@ private extension ConnectivityState {
             return .yellow
         case .vpnOK:
             return .green
-        case .tunActive:
+        case .vpnOrProxyActive:
             return .blue
         case .openInternet:
             return .mint

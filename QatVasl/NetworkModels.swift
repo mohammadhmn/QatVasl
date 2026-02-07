@@ -5,7 +5,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
     case domesticOnly
     case globalLimited
     case vpnOK
-    case tunActive
+    case vpnOrProxyActive
     case openInternet
 
     var shortLabel: String {
@@ -18,8 +18,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "LIMITED"
         case .vpnOK:
             return "VPN OK"
-        case .tunActive:
-            return "TUN ON"
+        case .vpnOrProxyActive:
+            return "VPN/PROXY"
         case .openInternet:
             return "OPEN"
         }
@@ -35,8 +35,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "Global web works, blocked services fail"
         case .vpnOK:
             return "Blocked targets reachable through proxy"
-        case .tunActive:
-            return "Traffic routed by system tunnel/proxy"
+        case .vpnOrProxyActive:
+            return "Traffic routed by VPN/PROXY overlay"
         case .openInternet:
             return "Blocked targets reachable without proxy"
         }
@@ -52,7 +52,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return 2
         case .vpnOK:
             return 3
-        case .tunActive:
+        case .vpnOrProxyActive:
             return 3
         case .openInternet:
             return 4
@@ -69,7 +69,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "yellow"
         case .vpnOK, .openInternet:
             return "green"
-        case .tunActive:
+        case .vpnOrProxyActive:
             return "yellow"
         }
     }
@@ -84,7 +84,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "network"
         case .vpnOK:
             return "lock.shield.fill"
-        case .tunActive:
+        case .vpnOrProxyActive:
             return "lock.fill"
         case .openInternet:
             return "globe.americas.fill"
@@ -105,8 +105,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "LMT"
         case .vpnOK:
             return "VPN"
-        case .tunActive:
-            return "TUN"
+        case .vpnOrProxyActive:
+            return "VPN"
         case .openInternet:
             return "OPEN"
         }
@@ -120,8 +120,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "🟠"
         case .globalLimited:
             return "🟡"
-        case .tunActive:
-            return "🔵"
+        case .vpnOrProxyActive:
+            return "🟣"
         case .vpnOK, .openInternet:
             return "🟢"
         }
@@ -137,8 +137,8 @@ enum ConnectivityState: String, Codable, CaseIterable {
             return "Global web works. VPN route likely blocked; rotate tunnel/profile."
         case .vpnOK:
             return "You are connected through VPN. Keep this config and monitor stability."
-        case .tunActive:
-            return "Direct-path verdict is paused. Disable TUN/proxy to test raw internet directly."
+        case .vpnOrProxyActive:
+            return "Direct-path verdict is paused. Disable VPN/PROXY to test raw internet directly."
         case .openInternet:
             return "Direct access is currently open. VPN is optional unless needed."
         }

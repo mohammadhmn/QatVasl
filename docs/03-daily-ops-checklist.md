@@ -13,9 +13,9 @@ Reduce decision fatigue and wasted time during unstable connectivity periods by 
 3. Open QatVasl menu bar panel.
 4. Confirm current route mode:
    - `Route: Direct path`
-   - `Route: TUN active`
-   - `Route: System proxy active`
-   - `Route: TUN + System Proxy`
+   - `Route: VPN active`
+   - `Route: PROXY active`
+   - `Route: VPN + PROXY`
 5. Read connectivity state and begin work only after stable result.
 
 ## State-Based Action Table
@@ -28,7 +28,7 @@ Reduce decision fatigue and wasted time during unstable connectivity periods by 
   - Action: global web is up but blocked route is down; rotate VPN route/profile.
 - `VPN OK`:
   - Action: continue work, monitor for drops.
-- `TUN ON`:
+- `VPN/PROXY`:
   - Action: route overlay is active; direct-path verdict is paused. Disable overlay only if you need true direct-path verification.
 - `OPEN`:
   - Action: direct blocked target is reachable now; VPN may be optional.

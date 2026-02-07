@@ -37,11 +37,11 @@ final class NetworkMonitor: ObservableObject {
     var routeModeLabel: String {
         switch (tunnelDetected, systemProxyDetected) {
         case (true, true):
-            return "Route: TUN + System Proxy"
+            return "Route: VPN + PROXY"
         case (true, false):
-            return "Route: TUN active"
+            return "Route: VPN active"
         case (false, true):
-            return "Route: System proxy active"
+            return "Route: PROXY active"
         case (false, false):
             return "Route: Direct path"
         }
@@ -195,7 +195,7 @@ final class NetworkMonitor: ObservableObject {
     private func evaluate(_ snapshot: ProbeSnapshot, routeContext: RouteContext) -> ConnectivityState {
         if routeContext.hasOverlay {
             if snapshot.domestic.ok || snapshot.global.ok || snapshot.blockedDirect.ok || snapshot.blockedProxy.ok {
-                return .tunActive
+                return .vpnOrProxyActive
             }
             return .offline
         }

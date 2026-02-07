@@ -102,7 +102,7 @@ QatVasl uses an `NSApplicationDelegate` for this.
 1. App launches.
 2. `NetworkMonitor` starts periodic loop.
 3. Every cycle:
-   - detect route context (TUN/proxy/client),
+   - detect route context (VPN route/proxy/client),
    - run probes (domestic/global/blocked direct/blocked via proxy),
    - evaluate `ConnectivityState`,
    - publish updates to UI,
@@ -127,7 +127,7 @@ QatVasl uses an `NSApplicationDelegate` for this.
 ## 7) Glossary
 
 - **Main actor**: the UI thread context in Swift concurrency.
-- **TUN**: virtual network interface used by VPN/tunnel clients.
+- **VPN route interface**: virtual interface (often `utun*`) used by VPN/tunnel clients.
 - **Proxy endpoint**: local host+port where VPN client exposes proxy.
 - **Probe**: network check against one target URL.
 - **Transition**: state change from previous connectivity state.

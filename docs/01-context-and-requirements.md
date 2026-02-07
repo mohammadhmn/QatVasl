@@ -9,7 +9,7 @@ In heavily restricted networks, internet health is not binary (`online`/`offline
 - Domestic domains may work while global routes fail.
 - Global routes may work while blocked services (for example Telegram) fail.
 - VPN may connect but still be unstable.
-- TUN/proxy routing can hide true direct-path behavior.
+- VPN/proxy routing can hide true direct-path behavior.
 - Connection state can degrade quickly after initially succeeding.
 
 The practical impact is severe: repeated ISP switching, VPN profile rotation, and lost work time.
@@ -34,7 +34,7 @@ Build a native macOS menu-bar app that continuously answers:
 - Must show route context:
   - direct path,
   - system proxy active,
-  - TUN active,
+  - VPN route active,
   - detected VPN client label (best effort).
 
 ## UX Requirements
@@ -50,7 +50,7 @@ Build a native macOS menu-bar app that continuously answers:
 - Native stack: Swift + SwiftUI + AppKit integration where needed.
 - Low-overhead probing (fast, lightweight requests).
 - Stable persistence for settings and transition history.
-- Robust behavior when proxies/TUN are enabled.
+- Robust behavior when VPN/proxy routing is enabled.
 - Buildable from both Xcode and CLI (`just`, `xcodebuild`).
 
 ## Default Operating Assumptions

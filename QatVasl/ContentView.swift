@@ -243,7 +243,7 @@ struct ContentView: View {
 
                 if !monitor.isDirectPathClean {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Direct path check paused while TUN/proxy is active.", systemImage: "info.circle")
+                        Label("Direct path check paused while VPN/PROXY is active.", systemImage: "info.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -423,7 +423,7 @@ struct ContentView: View {
             return .yellow
         case .vpnOK:
             return .green
-        case .tunActive:
+        case .vpnOrProxyActive:
             return .blue
         case .openInternet:
             return .mint

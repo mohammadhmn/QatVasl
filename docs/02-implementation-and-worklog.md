@@ -6,7 +6,7 @@ Date: 2026-02-07
 
 QatVasl is implemented as a native SwiftUI macOS app in:
 
-- `QatVasl/QatVasl/`
+- `QatVasl/`
 
 Core runtime components:
 
@@ -22,14 +22,14 @@ Core runtime components:
 
 ## Feature Set Implemented
 
-- Menu bar status with compact label (`OFF`, `IR`, `LMT`, `VPN`, `TUN`, `OPEN`) and colored dot.
+- Menu bar status with compact label (`OFF`, `IR`, `LMT`, `VPN`, `OPEN`) and colored dot.
 - Dashboard with:
   - overview,
   - probes,
   - transition timeline,
   - settings shortcut.
 - Route context detection:
-  - system TUN detection,
+  - system VPN-route detection,
   - system proxy detection,
   - best-effort VPN client label (service/process based).
 - Connectivity probes:
@@ -47,7 +47,7 @@ Core runtime components:
 - `IR ONLY`: domestic up, global down
 - `LIMITED`: global up, blocked target down
 - `VPN OK`: blocked target reachable through configured proxy
-- `TUN ON`: system TUN/proxy active, direct-path verdict not authoritative
+- `VPN/PROXY`: system VPN/proxy active, direct-path verdict not authoritative
 - `OPEN`: blocked target reachable directly
 
 ## Performance Work Completed

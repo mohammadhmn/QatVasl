@@ -18,14 +18,14 @@ This is expected behavior.
 QatVasl intentionally switches to menu-bar-only mode when no app window is visible.  
 Use menu bar item → `Dashboard` to reopen window.
 
-## Q3) Route says `TUN ON`. What does that mean?
+## Q3) Route says `VPN/PROXY`. What does that mean?
 
-`TUN ON` means system-level tunnel/proxy overlay is active.  
+`VPN/PROXY` means system-level VPN/proxy overlay is active.  
 Direct-path verdict is not authoritative in this mode because traffic is being routed through overlay.
 
 If you need true direct-path test:
 
-1. Temporarily disable VPN/TUN/system proxy.
+1. Temporarily disable VPN/system proxy.
 2. Refresh QatVasl.
 
 ## Q4) VPN works in client, but app does not show `VPN OK`
@@ -98,7 +98,7 @@ Then relaunch app.
 
 - Connected VPN services:
   - `scutil --nc list`
-- Interfaces (look for `utun*`):
+- Interfaces (look for VPN route interfaces like `utun*`):
   - `ifconfig`
 - Known VPN processes:
   - `ps -axo comm | egrep -i 'happ|openvpn|wireguard|v2ray|xray|sing-box|clash'`

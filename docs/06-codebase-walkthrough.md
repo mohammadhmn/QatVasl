@@ -4,24 +4,24 @@ This guide explains how the app is organized and where to edit specific behavior
 
 ## 1) Project Layout
 
-- Native app root: `QatVasl/QatVasl/`
+- Native app root: `QatVasl/`
 - Xcode project: `QatVasl.xcodeproj`
-- Build automation: `QatVasl/justfile`
+- Build automation: `justfile`
 
 Primary source files:
 
-- `QatVasl/QatVasl/QatVaslApp.swift`
-- `QatVasl/QatVasl/NetworkMonitor.swift`
-- `QatVasl/QatVasl/NetworkModels.swift`
-- `QatVasl/QatVasl/SettingsStore.swift`
-- `QatVasl/QatVasl/ContentView.swift`
-- `QatVasl/QatVasl/MenuBarContentView.swift`
-- `QatVasl/QatVasl/SettingsView.swift`
-- `QatVasl/QatVasl/DashboardComponents.swift`
+- `QatVasl/QatVaslApp.swift`
+- `QatVasl/NetworkMonitor.swift`
+- `QatVasl/NetworkModels.swift`
+- `QatVasl/SettingsStore.swift`
+- `QatVasl/ContentView.swift`
+- `QatVasl/MenuBarContentView.swift`
+- `QatVasl/SettingsView.swift`
+- `QatVasl/DashboardComponents.swift`
 
 ## 2) Entry Point and App Scenes
 
-File: `QatVasl/QatVasl/QatVaslApp.swift`
+File: `QatVasl/QatVaslApp.swift`
 
 Responsibilities:
 
@@ -36,13 +36,13 @@ If you need to change app lifecycle behavior, start here.
 
 ## 3) Monitoring Engine
 
-File: `QatVasl/QatVasl/NetworkMonitor.swift`
+File: `QatVasl/NetworkMonitor.swift`
 
 Responsibilities:
 
 - Runs periodic loop (`restartLoop`, `runCheck`).
 - Detects route context:
-  - TUN active?
+  - VPN route active?
   - system proxy active?
   - likely VPN client name?
 - Runs four probes.
@@ -71,7 +71,7 @@ Responsibilities:
 
 ## 4) Domain Models
 
-File: `QatVasl/QatVasl/NetworkModels.swift`
+File: `QatVasl/NetworkModels.swift`
 
 Contains:
 
@@ -93,7 +93,7 @@ This file is your first stop for changing:
 
 ## 5) Persistence and Settings Logic
 
-File: `QatVasl/QatVasl/SettingsStore.swift`
+File: `QatVasl/SettingsStore.swift`
 
 Responsibilities:
 
@@ -107,7 +107,7 @@ Responsibilities:
 
 ### Dashboard UI
 
-File: `QatVasl/QatVasl/ContentView.swift`
+File: `QatVasl/ContentView.swift`
 
 Contains:
 
@@ -119,7 +119,7 @@ Contains:
 
 ### Menu bar popover UI
 
-File: `QatVasl/QatVasl/MenuBarContentView.swift`
+File: `QatVasl/MenuBarContentView.swift`
 
 Contains compact operational panel:
 
@@ -130,13 +130,13 @@ Contains compact operational panel:
 
 ### Settings UI
 
-File: `QatVasl/QatVasl/SettingsView.swift`
+File: `QatVasl/SettingsView.swift`
 
 Contains editable controls for monitor and proxy behavior.
 
 ### Shared visual components
 
-File: `QatVasl/QatVasl/DashboardComponents.swift`
+File: `QatVasl/DashboardComponents.swift`
 
 Contains reusable components:
 
@@ -149,8 +149,8 @@ Contains reusable components:
 
 In `NetworkMonitor.evaluate(...)`:
 
-1. If TUN/proxy overlay is active:
-   - any reachable probe => `TUN ON`
+1. If VPN/proxy overlay is active:
+   - any reachable probe => `VPN/PROXY`
    - else => `OFFLINE`
 2. If no overlay:
    - blocked direct reachable => `OPEN`
@@ -174,13 +174,13 @@ Example: add a new probe target.
 ## 9) Common Edit Recipes
 
 - Change default proxy port:
-  - `QatVasl/QatVasl/NetworkModels.swift`
+  - `QatVasl/NetworkModels.swift`
 - Change app launch behavior:
-  - `QatVasl/QatVasl/QatVaslApp.swift`
+  - `QatVasl/QatVaslApp.swift`
 - Change notification wording:
-  - `QatVasl/QatVasl/NetworkMonitor.swift`
+  - `QatVasl/NetworkMonitor.swift`
 - Change menu bar UI text:
-  - `QatVasl/QatVasl/MenuBarContentView.swift`
+  - `QatVasl/MenuBarContentView.swift`
 
 ## 10) Recommended Reading Sequence for New Contributors
 
