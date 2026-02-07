@@ -7,6 +7,14 @@ struct ContentView: View {
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var navigationStore: DashboardNavigationStore
 
+    private var settings: MonitorSettings {
+        settingsStore.settings
+    }
+
+    private var conciseRouteLabel: String {
+        monitor.routeModeLabel.replacingOccurrences(of: "Route: ", with: "")
+    }
+
     private var sidebarSelection: Binding<DashboardSection?> {
         Binding(
             get: { navigationStore.selectedSection },
@@ -52,7 +60,7 @@ struct ContentView: View {
                         .font(.callout.weight(.semibold))
                 } icon: {
                     Image(systemName: section.systemImage)
-                        .foregroundStyle(color(for: section).opacity(0.8))
+                        .foregroundStyle(section.accentColor.opacity(0.8))
                 }
                 .tag(section)
             }
@@ -148,7 +156,7 @@ struct ContentView: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(monitor.routeModeLabel)
                         .font(.caption.weight(.semibold))
-                    if let activeProfile = settingsStore.settings.activeProfile {
+                    if let activeProfile = settings.activeProfile {
                         Text("ISP \(activeProfile.name)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -196,7 +204,7 @@ struct ContentView: View {
                     Text("Context")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("Proxy \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
+                    Text("Proxy \(settings.proxyHost):\(settings.proxyPort)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let vpnClientLabel = monitor.vpnClientLabel {
@@ -315,7 +323,7 @@ struct ContentView: View {
                     let healthy = monitor.criticalServiceResults.filter(\.overallOk).count
                     HStack(spacing: 10) {
                         timelineMetric(title: "Services up", value: "\(healthy)/\(total)", subtitle: "Current checks")
-                        timelineMetric(title: "Route", value: monitor.routeModeLabel.replacingOccurrences(of: "Route: ", with: ""), subtitle: "Active path")
+                        timelineMetric(title: "Route", value: conciseRouteLabel, subtitle: "Active path")
                     }
 
                     ForEach(monitor.criticalServiceResults) { service in
@@ -425,19 +433,6 @@ struct ContentView: View {
         SettingsView(embedded: true)
     }
 
-    private func color(for section: DashboardSection) -> Color {
-        switch section {
-        case .live:
-            return .cyan
-        case .services:
-            return .mint
-        case .history:
-            return .indigo
-        case .settings:
-            return .purple
-        }
-    }
-
     private func copyDiagnosisToClipboard() {
         let snapshotSummary: String
         if let snapshot = monitor.lastSnapshot {
@@ -466,7 +461,7 @@ struct ContentView: View {
     }
 
     private func exportDiagnosticsReport() {
-        let report = monitor.diagnosticsReport(settings: settingsStore.settings)
+        let report = monitor.diagnosticsReport(settings: settings)
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "qatvasl-diagnostics-\(Int(Date().timeIntervalSince1970)).txt"
         panel.allowedContentTypes = [.plainText]

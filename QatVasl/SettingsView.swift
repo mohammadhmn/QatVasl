@@ -7,6 +7,10 @@ struct SettingsView: View {
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var monitor: NetworkMonitor
 
+    private var settings: MonitorSettings {
+        settingsStore.settings
+    }
+
     init(embedded: Bool = false) {
         self.embedded = embedded
     }
@@ -81,11 +85,11 @@ struct SettingsView: View {
                 Picker(
                     "Active profile",
                     selection: Binding(
-                        get: { settingsStore.settings.activeProfileID },
+                        get: { settings.activeProfileID },
                         set: { settingsStore.selectISPProfile($0) }
                     )
                 ) {
-                    ForEach(settingsStore.settings.ispProfiles) { profile in
+                    ForEach(settings.ispProfiles) { profile in
                         Text(profile.name).tag(profile.id)
                     }
                 }
@@ -94,9 +98,9 @@ struct SettingsView: View {
                 TextField(
                     "Profile name",
                     text: Binding(
-                        get: { settingsStore.settings.activeProfile?.name ?? "" },
+                        get: { settings.activeProfile?.name ?? "" },
                         set: { name in
-                            settingsStore.renameISPProfile(settingsStore.settings.activeProfileID, to: name)
+                            settingsStore.renameISPProfile(settings.activeProfileID, to: name)
                         }
                     )
                 )
@@ -111,16 +115,16 @@ struct SettingsView: View {
                     .buttonStyle(.glass)
 
                     Button {
-                        settingsStore.removeISPProfile(settingsStore.settings.activeProfileID)
+                        settingsStore.removeISPProfile(settings.activeProfileID)
                     } label: {
                         Label("Remove", systemImage: "trash")
                     }
                     .buttonStyle(.glass)
-                    .disabled(settingsStore.settings.ispProfiles.count <= 1)
+                    .disabled(settings.ispProfiles.count <= 1)
 
                     Spacer()
 
-                    Text("\(settingsStore.settings.ispProfiles.count) profiles")
+                    Text("\(settings.ispProfiles.count) profiles")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -163,7 +167,7 @@ struct SettingsView: View {
                     Text("Interval")
                     Spacer()
                     Stepper(value: binding(\.intervalSeconds), in: 10...300, step: 5) {
-                        Text("\(Int(settingsStore.settings.intervalSeconds)) sec")
+                        Text("\(Int(settings.intervalSeconds)) sec")
                             .frame(width: 90, alignment: .trailing)
                     }
                     .frame(width: 170)
@@ -173,7 +177,7 @@ struct SettingsView: View {
                     Text("Timeout")
                     Spacer()
                     Stepper(value: binding(\.timeoutSeconds), in: 2...30, step: 1) {
-                        Text("\(Int(settingsStore.settings.timeoutSeconds)) sec")
+                        Text("\(Int(settings.timeoutSeconds)) sec")
                             .frame(width: 90, alignment: .trailing)
                     }
                     .frame(width: 170)
@@ -232,7 +236,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                ForEach(settingsStore.settings.criticalServices) { service in
+                ForEach(settings.criticalServices) { service in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Toggle(
@@ -311,7 +315,7 @@ struct SettingsView: View {
                     Text("Alert cooldown")
                     Spacer()
                     Stepper(value: binding(\.notificationCooldownMinutes), in: 0...30, step: 1) {
-                        Text("\(Int(settingsStore.settings.notificationCooldownMinutes)) min")
+                        Text("\(Int(settings.notificationCooldownMinutes)) min")
                             .frame(width: 90, alignment: .trailing)
                     }
                     .frame(width: 170)
@@ -319,12 +323,12 @@ struct SettingsView: View {
 
                 Toggle("Quiet hours", isOn: binding(\.quietHoursEnabled))
 
-                if settingsStore.settings.quietHoursEnabled {
+                if settings.quietHoursEnabled {
                     HStack {
                         Text("From")
                         Spacer()
                         Stepper(value: binding(\.quietHoursStart), in: 0...23, step: 1) {
-                            Text(hourLabel(settingsStore.settings.quietHoursStart))
+                            Text(hourLabel(settings.quietHoursStart))
                                 .frame(width: 90, alignment: .trailing)
                         }
                         .frame(width: 170)
@@ -334,7 +338,7 @@ struct SettingsView: View {
                         Text("To")
                         Spacer()
                         Stepper(value: binding(\.quietHoursEnd), in: 0...23, step: 1) {
-                            Text(hourLabel(settingsStore.settings.quietHoursEnd))
+                            Text(hourLabel(settings.quietHoursEnd))
                                 .frame(width: 90, alignment: .trailing)
                         }
                         .frame(width: 170)
@@ -344,7 +348,7 @@ struct SettingsView: View {
                 Toggle(
                     "Launch at login",
                     isOn: Binding(
-                        get: { settingsStore.settings.launchAtLogin },
+                        get: { settings.launchAtLogin },
                         set: { settingsStore.setLaunchAtLogin($0) }
                     )
                 )
@@ -378,12 +382,11 @@ struct SettingsView: View {
 
     private func binding<Value>(_ keyPath: WritableKeyPath<MonitorSettings, Value>) -> Binding<Value> {
         Binding(
-            get: { settingsStore.settings[keyPath: keyPath] },
+            get: { settings[keyPath: keyPath] },
             set: { newValue in
-                var updated = settingsStore.settings
-                updated[keyPath: keyPath] = newValue
-                updated.syncActiveProfileFromCurrentValues()
-                settingsStore.settings = updated
+                settingsStore.update { updated in
+                    updated[keyPath: keyPath] = newValue
+                }
             }
         )
     }

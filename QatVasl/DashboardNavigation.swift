@@ -1,5 +1,5 @@
 import Combine
-import Foundation
+import SwiftUI
 
 enum DashboardSection: String, CaseIterable, Identifiable {
     case live
@@ -45,6 +45,19 @@ enum DashboardSection: String, CaseIterable, Identifiable {
             return "clock.arrow.circlepath"
         case .settings:
             return "gearshape.fill"
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .live:
+            return .cyan
+        case .services:
+            return .mint
+        case .history:
+            return .indigo
+        case .settings:
+            return .purple
         }
     }
 

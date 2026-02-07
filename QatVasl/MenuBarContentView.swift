@@ -7,6 +7,10 @@ struct MenuBarContentView: View {
     @EnvironmentObject private var navigationStore: DashboardNavigationStore
     @Environment(\.openWindow) private var openWindow
 
+    private var settings: MonitorSettings {
+        settingsStore.settings
+    }
+
     private var quickProbes: [ProbeResult] {
         guard let snapshot = monitor.lastSnapshot else {
             return []
@@ -33,11 +37,11 @@ struct MenuBarContentView: View {
                     .font(.caption.weight(.semibold))
                     .lineLimit(2)
 
-                Text("\(monitor.routeModeLabel) · Proxy \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
+                Text("\(monitor.routeModeLabel) · Proxy \(settings.proxyHost):\(settings.proxyPort)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                if let activeProfile = settingsStore.settings.activeProfile {
+                if let activeProfile = settings.activeProfile {
                     Text("ISP \(activeProfile.name)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
