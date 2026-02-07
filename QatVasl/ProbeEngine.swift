@@ -37,22 +37,22 @@ final class ProbeEngine {
     func runSnapshot(settings: MonitorSettings) async -> ProbeSnapshot {
         async let domestic = probeDirect(
             kind: .domestic,
-            target: settings.domesticURL,
+            targets: settings.domesticProbeTargets,
             timeout: settings.normalizedTimeout
         )
         async let global = probeDirect(
             kind: .global,
-            target: settings.globalURL,
+            targets: settings.globalProbeTargets,
             timeout: settings.normalizedTimeout
         )
         async let restrictedDirect = probeDirect(
             kind: .restrictedDirect,
-            target: settings.blockedURL,
+            targets: settings.blockedProbeTargets,
             timeout: settings.normalizedTimeout
         )
         async let restrictedViaProxy = probeProxy(
             kind: .restrictedViaProxy,
-            target: settings.blockedURL,
+            targets: settings.blockedProbeTargets,
             settings: settings
         )
 
@@ -141,6 +141,76 @@ final class ProbeEngine {
 
     private func probeDirect(
         kind: ProbeKind,
+        targets: [String],
+        timeout: TimeInterval
+    ) async -> ProbeResult {
+        let candidates = sanitizedTargets(targets)
+        guard !candidates.isEmpty else {
+            return missingTargetResult(kind: kind)
+        }
+
+        var lastFailure = missingTargetResult(kind: kind)
+        for target in candidates {
+            let result = await probeDirectSingle(kind: kind, target: target, timeout: timeout)
+            if result.ok {
+                return result
+            }
+            lastFailure = result
+        }
+
+        return lastFailure
+    }
+
+    private func probeProxy(
+        kind: ProbeKind,
+        targets: [String],
+        settings: MonitorSettings
+    ) async -> ProbeResult {
+        let candidates = sanitizedTargets(targets)
+        guard !candidates.isEmpty else {
+            return missingTargetResult(kind: kind)
+        }
+
+        let primaryTarget = candidates.first ?? "N/A"
+        if !settings.proxyEnabled {
+            return ProbeResult(
+                kind: kind,
+                target: primaryTarget,
+                ok: false,
+                statusCode: nil,
+                latencyMs: nil,
+                error: "Proxy check disabled"
+            )
+        }
+
+        let session = proxySession(for: settings)
+        var lastFailure = ProbeResult(
+            kind: kind,
+            target: primaryTarget,
+            ok: false,
+            statusCode: nil,
+            latencyMs: nil,
+            error: "Proxy probe failed"
+        )
+
+        for target in candidates {
+            let result = await probeProxySingle(
+                kind: kind,
+                target: target,
+                timeout: settings.normalizedTimeout,
+                session: session
+            )
+            if result.ok {
+                return result
+            }
+            lastFailure = result
+        }
+
+        return lastFailure
+    }
+
+    private func probeDirectSingle(
+        kind: ProbeKind,
         target: String,
         timeout: TimeInterval
     ) async -> ProbeResult {
@@ -164,22 +234,12 @@ final class ProbeEngine {
         )
     }
 
-    private func probeProxy(
+    private func probeProxySingle(
         kind: ProbeKind,
         target: String,
-        settings: MonitorSettings
+        timeout: TimeInterval,
+        session: URLSession
     ) async -> ProbeResult {
-        if !settings.proxyEnabled {
-            return ProbeResult(
-                kind: kind,
-                target: target,
-                ok: false,
-                statusCode: nil,
-                latencyMs: nil,
-                error: "Proxy check disabled"
-            )
-        }
-
         guard let url = URL(string: target) else {
             return ProbeResult(
                 kind: kind,
@@ -191,13 +251,44 @@ final class ProbeEngine {
             )
         }
 
-        let request = makeRequest(url: url, timeout: settings.normalizedTimeout)
-        let session = proxySession(for: settings)
+        let request = makeRequest(url: url, timeout: timeout)
         return await performProbe(
             kind: kind,
             target: target,
             request: request,
             session: session
+        )
+    }
+
+    private func sanitizedTargets(_ targets: [String]) -> [String] {
+        var seen = Set<String>()
+        var results: [String] = []
+        results.reserveCapacity(targets.count)
+
+        for raw in targets {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                continue
+            }
+            let key = trimmed.lowercased()
+            guard !seen.contains(key) else {
+                continue
+            }
+            seen.insert(key)
+            results.append(trimmed)
+        }
+
+        return results
+    }
+
+    private func missingTargetResult(kind: ProbeKind) -> ProbeResult {
+        ProbeResult(
+            kind: kind,
+            target: "N/A",
+            ok: false,
+            statusCode: nil,
+            latencyMs: nil,
+            error: "No websites configured"
         )
     }
 

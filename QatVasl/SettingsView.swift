@@ -31,18 +31,21 @@ struct SettingsView: View {
 
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.14)) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Settings")
-                        .font(.headline)
-                    Text("Configure monitoring, routes, profiles, and alerts.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if !embedded {
+                GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.14)) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Settings")
+                            .font(.headline)
+                        Text("Configure monitoring, routes, profiles, and alerts.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
             profilesAndPresetsCard
             monitoringAndTargetsCard
+            websiteTargetsCard
             routesAndServicesCard
             notificationsAndSystemCard
             settingsActions
@@ -160,7 +163,7 @@ struct SettingsView: View {
     private var monitoringAndTargetsCard: some View {
         GlassCard(cornerRadius: 18, tint: .mint.opacity(0.13)) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Monitoring & Targets")
+                Text("Monitoring")
                     .font(.headline)
 
                 HStack {
@@ -182,15 +185,63 @@ struct SettingsView: View {
                     }
                     .frame(width: 170)
                 }
+            }
+        }
+    }
 
-                Divider()
+    private var websiteTargetsCard: some View {
+        GlassCard(cornerRadius: 18, tint: .teal.opacity(0.12)) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Probe Websites")
+                    .font(.headline)
 
-                TextField("Domestic URL", text: binding(\.domesticURL))
-                    .textFieldStyle(.roundedBorder)
-                TextField("Global URL", text: binding(\.globalURL))
-                    .textFieldStyle(.roundedBorder)
-                TextField("Restricted Service URL", text: binding(\.blockedURL))
-                    .textFieldStyle(.roundedBorder)
+                Text("Add or edit the websites used for each connectivity condition.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                probeWebsiteField(
+                    title: "Domestic",
+                    subtitle: "Used for local/internal network reachability checks.",
+                    systemImage: "house.fill",
+                    primaryText: binding(\.domesticURL),
+                    extraTargets: settings.domesticExtraURLs,
+                    extraKeyPath: \.domesticExtraURLs
+                )
+
+                probeWebsiteField(
+                    title: "Global",
+                    subtitle: "Used for general external internet availability.",
+                    systemImage: "globe",
+                    primaryText: binding(\.globalURL),
+                    extraTargets: settings.globalExtraURLs,
+                    extraKeyPath: \.globalExtraURLs
+                )
+
+                probeWebsiteField(
+                    title: "Blocked Service (Proxy)",
+                    subtitle: "Used to verify blocked-service access through proxy route.",
+                    systemImage: "lock.shield.fill",
+                    primaryText: binding(\.blockedURL),
+                    extraTargets: settings.blockedExtraURLs,
+                    extraKeyPath: \.blockedExtraURLs
+                )
+
+                HStack {
+                    Spacer()
+                    Button {
+                        settingsStore.update { updated in
+                            updated.domesticURL = MonitorSettings.defaults.domesticURL
+                            updated.domesticExtraURLs = []
+                            updated.globalURL = MonitorSettings.defaults.globalURL
+                            updated.globalExtraURLs = []
+                            updated.blockedURL = MonitorSettings.defaults.blockedURL
+                            updated.blockedExtraURLs = []
+                        }
+                    } label: {
+                        Label("Reset website targets", systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(.glass)
+                }
             }
         }
     }
@@ -389,6 +440,101 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private func probeWebsiteField(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        primaryText: Binding<String>,
+        extraTargets: [String],
+        extraKeyPath: WritableKeyPath<MonitorSettings, [String]>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
+
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            TextField("Primary website", text: primaryText)
+                .textFieldStyle(.roundedBorder)
+
+            if !extraTargets.isEmpty {
+                ForEach(Array(extraTargets.enumerated()), id: \.offset) { index, _ in
+                    HStack(spacing: 8) {
+                        TextField(
+                            "Optional website \(index + 1)",
+                            text: extraTargetBinding(extraKeyPath, index: index)
+                        )
+                        .textFieldStyle(.roundedBorder)
+
+                        Button(role: .destructive) {
+                            removeExtraTarget(extraKeyPath, index: index)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    addExtraTarget(extraKeyPath)
+                } label: {
+                    Label("Add optional website", systemImage: "plus")
+                }
+                .buttonStyle(.glass)
+            }
+        }
+        .padding(10)
+        .glassEffect(.regular.tint(.white.opacity(0.02)), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func extraTargetBinding(
+        _ keyPath: WritableKeyPath<MonitorSettings, [String]>,
+        index: Int
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                let values = settings[keyPath: keyPath]
+                guard values.indices.contains(index) else {
+                    return ""
+                }
+                return values[index]
+            },
+            set: { newValue in
+                settingsStore.update { updated in
+                    guard updated[keyPath: keyPath].indices.contains(index) else {
+                        return
+                    }
+                    updated[keyPath: keyPath][index] = newValue
+                }
+            }
+        )
+    }
+
+    private func addExtraTarget(_ keyPath: WritableKeyPath<MonitorSettings, [String]>) {
+        settingsStore.update { updated in
+            updated[keyPath: keyPath].append("https://")
+        }
+    }
+
+    private func removeExtraTarget(_ keyPath: WritableKeyPath<MonitorSettings, [String]>, index: Int) {
+        settingsStore.update { updated in
+            guard updated[keyPath: keyPath].indices.contains(index) else {
+                return
+            }
+            updated[keyPath: keyPath].remove(at: index)
+        }
     }
 
     private func hourLabel(_ hour: Int) -> String {

@@ -31,7 +31,7 @@ enum ConnectivityState: String, Codable, CaseIterable {
         case .degraded:
             return "Internet is partially available"
         case .vpnIssue:
-            return "VPN/TUN is up but restricted route is failing"
+            return "VPN/TUN is up but Blocked Service route is failing"
         case .usable:
             return "Internet is currently usable"
         }
@@ -199,12 +199,32 @@ struct ISPProfile: Codable, Equatable, Identifiable {
     var intervalSeconds: Double
     var timeoutSeconds: Double
     var domesticURL: String
+    var domesticExtraURLs: [String]
     var globalURL: String
+    var globalExtraURLs: [String]
     var blockedURL: String
+    var blockedExtraURLs: [String]
     var proxyEnabled: Bool
     var proxyType: ProxyType
     var proxyHost: String
     var proxyPort: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case intervalSeconds
+        case timeoutSeconds
+        case domesticURL
+        case domesticExtraURLs
+        case globalURL
+        case globalExtraURLs
+        case blockedURL
+        case blockedExtraURLs
+        case proxyEnabled
+        case proxyType
+        case proxyHost
+        case proxyPort
+    }
 
     init(
         id: String = UUID().uuidString,
@@ -212,8 +232,11 @@ struct ISPProfile: Codable, Equatable, Identifiable {
         intervalSeconds: Double,
         timeoutSeconds: Double,
         domesticURL: String,
+        domesticExtraURLs: [String] = [],
         globalURL: String,
+        globalExtraURLs: [String] = [],
         blockedURL: String,
+        blockedExtraURLs: [String] = [],
         proxyEnabled: Bool,
         proxyType: ProxyType,
         proxyHost: String,
@@ -224,12 +247,34 @@ struct ISPProfile: Codable, Equatable, Identifiable {
         self.intervalSeconds = intervalSeconds
         self.timeoutSeconds = timeoutSeconds
         self.domesticURL = domesticURL
+        self.domesticExtraURLs = domesticExtraURLs
         self.globalURL = globalURL
+        self.globalExtraURLs = globalExtraURLs
         self.blockedURL = blockedURL
+        self.blockedExtraURLs = blockedExtraURLs
         self.proxyEnabled = proxyEnabled
         self.proxyType = proxyType
         self.proxyHost = proxyHost
         self.proxyPort = proxyPort
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "ISP"
+        intervalSeconds = try container.decodeIfPresent(Double.self, forKey: .intervalSeconds) ?? 30
+        timeoutSeconds = try container.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? 7
+        domesticURL = try container.decodeIfPresent(String.self, forKey: .domesticURL) ?? MonitorSettings.defaults.domesticURL
+        domesticExtraURLs = try container.decodeIfPresent([String].self, forKey: .domesticExtraURLs) ?? []
+        globalURL = try container.decodeIfPresent(String.self, forKey: .globalURL) ?? MonitorSettings.defaults.globalURL
+        globalExtraURLs = try container.decodeIfPresent([String].self, forKey: .globalExtraURLs) ?? []
+        blockedURL = try container.decodeIfPresent(String.self, forKey: .blockedURL) ?? MonitorSettings.defaults.blockedURL
+        blockedExtraURLs = try container.decodeIfPresent([String].self, forKey: .blockedExtraURLs) ?? []
+        proxyEnabled = try container.decodeIfPresent(Bool.self, forKey: .proxyEnabled) ?? true
+        proxyType = try container.decodeIfPresent(ProxyType.self, forKey: .proxyType) ?? .socks5
+        proxyHost = try container.decodeIfPresent(String.self, forKey: .proxyHost) ?? "127.0.0.1"
+        proxyPort = try container.decodeIfPresent(Int.self, forKey: .proxyPort) ?? 10808
     }
 
     static func fromCurrentSettings(_ settings: MonitorSettings, name: String, id: String = UUID().uuidString) -> ISPProfile {
@@ -239,8 +284,11 @@ struct ISPProfile: Codable, Equatable, Identifiable {
             intervalSeconds: settings.intervalSeconds,
             timeoutSeconds: settings.timeoutSeconds,
             domesticURL: settings.domesticURL,
+            domesticExtraURLs: settings.domesticExtraURLs,
             globalURL: settings.globalURL,
+            globalExtraURLs: settings.globalExtraURLs,
             blockedURL: settings.blockedURL,
+            blockedExtraURLs: settings.blockedExtraURLs,
             proxyEnabled: settings.proxyEnabled,
             proxyType: settings.proxyType,
             proxyHost: settings.proxyHost,
@@ -252,8 +300,11 @@ struct ISPProfile: Codable, Equatable, Identifiable {
         settings.intervalSeconds = intervalSeconds
         settings.timeoutSeconds = timeoutSeconds
         settings.domesticURL = domesticURL
+        settings.domesticExtraURLs = domesticExtraURLs
         settings.globalURL = globalURL
+        settings.globalExtraURLs = globalExtraURLs
         settings.blockedURL = blockedURL
+        settings.blockedExtraURLs = blockedExtraURLs
         settings.proxyEnabled = proxyEnabled
         settings.proxyType = proxyType
         settings.proxyHost = proxyHost
@@ -331,8 +382,11 @@ struct MonitorSettings: Codable, Equatable {
     var intervalSeconds: Double
     var timeoutSeconds: Double
     var domesticURL: String
+    var domesticExtraURLs: [String]
     var globalURL: String
+    var globalExtraURLs: [String]
     var blockedURL: String
+    var blockedExtraURLs: [String]
     var proxyEnabled: Bool
     var proxyType: ProxyType
     var proxyHost: String
@@ -353,8 +407,11 @@ struct MonitorSettings: Codable, Equatable {
         case intervalSeconds
         case timeoutSeconds
         case domesticURL
+        case domesticExtraURLs
         case globalURL
+        case globalExtraURLs
         case blockedURL
+        case blockedExtraURLs
         case proxyEnabled
         case proxyType
         case proxyHost
@@ -377,8 +434,11 @@ struct MonitorSettings: Codable, Equatable {
             intervalSeconds: 30,
             timeoutSeconds: 7,
             domesticURL: "https://www.aparat.com/",
+            domesticExtraURLs: [],
             globalURL: "https://www.google.com/generate_204",
+            globalExtraURLs: [],
             blockedURL: "https://web.telegram.org/",
+            blockedExtraURLs: [],
             proxyEnabled: true,
             proxyType: .socks5,
             proxyHost: "127.0.0.1",
@@ -401,8 +461,11 @@ struct MonitorSettings: Codable, Equatable {
         intervalSeconds: Double,
         timeoutSeconds: Double,
         domesticURL: String,
+        domesticExtraURLs: [String] = [],
         globalURL: String,
+        globalExtraURLs: [String] = [],
         blockedURL: String,
+        blockedExtraURLs: [String] = [],
         proxyEnabled: Bool,
         proxyType: ProxyType,
         proxyHost: String,
@@ -422,8 +485,11 @@ struct MonitorSettings: Codable, Equatable {
         self.intervalSeconds = intervalSeconds
         self.timeoutSeconds = timeoutSeconds
         self.domesticURL = domesticURL
+        self.domesticExtraURLs = domesticExtraURLs
         self.globalURL = globalURL
+        self.globalExtraURLs = globalExtraURLs
         self.blockedURL = blockedURL
+        self.blockedExtraURLs = blockedExtraURLs
         self.proxyEnabled = proxyEnabled
         self.proxyType = proxyType
         self.proxyHost = proxyHost
@@ -450,8 +516,11 @@ struct MonitorSettings: Codable, Equatable {
         intervalSeconds = try container.decodeIfPresent(Double.self, forKey: .intervalSeconds) ?? defaults.intervalSeconds
         timeoutSeconds = try container.decodeIfPresent(Double.self, forKey: .timeoutSeconds) ?? defaults.timeoutSeconds
         domesticURL = try container.decodeIfPresent(String.self, forKey: .domesticURL) ?? defaults.domesticURL
+        domesticExtraURLs = try container.decodeIfPresent([String].self, forKey: .domesticExtraURLs) ?? defaults.domesticExtraURLs
         globalURL = try container.decodeIfPresent(String.self, forKey: .globalURL) ?? defaults.globalURL
+        globalExtraURLs = try container.decodeIfPresent([String].self, forKey: .globalExtraURLs) ?? defaults.globalExtraURLs
         blockedURL = try container.decodeIfPresent(String.self, forKey: .blockedURL) ?? defaults.blockedURL
+        blockedExtraURLs = try container.decodeIfPresent([String].self, forKey: .blockedExtraURLs) ?? defaults.blockedExtraURLs
         proxyEnabled = try container.decodeIfPresent(Bool.self, forKey: .proxyEnabled) ?? defaults.proxyEnabled
         proxyType = try container.decodeIfPresent(ProxyType.self, forKey: .proxyType) ?? defaults.proxyType
         proxyHost = try container.decodeIfPresent(String.self, forKey: .proxyHost) ?? defaults.proxyHost
@@ -490,6 +559,18 @@ struct MonitorSettings: Codable, Equatable {
 
     var normalizedQuietHoursEnd: Int {
         max(0, min(quietHoursEnd, 23))
+    }
+
+    var domesticProbeTargets: [String] {
+        mergedProbeTargets(primary: domesticURL, extras: domesticExtraURLs)
+    }
+
+    var globalProbeTargets: [String] {
+        mergedProbeTargets(primary: globalURL, extras: globalExtraURLs)
+    }
+
+    var blockedProbeTargets: [String] {
+        mergedProbeTargets(primary: blockedURL, extras: blockedExtraURLs)
     }
 
     mutating func applyPreset(_ preset: SettingsPreset) {
@@ -541,8 +622,11 @@ struct MonitorSettings: Codable, Equatable {
         ispProfiles[index].intervalSeconds = intervalSeconds
         ispProfiles[index].timeoutSeconds = timeoutSeconds
         ispProfiles[index].domesticURL = domesticURL
+        ispProfiles[index].domesticExtraURLs = domesticExtraURLs
         ispProfiles[index].globalURL = globalURL
+        ispProfiles[index].globalExtraURLs = globalExtraURLs
         ispProfiles[index].blockedURL = blockedURL
+        ispProfiles[index].blockedExtraURLs = blockedExtraURLs
         ispProfiles[index].proxyEnabled = proxyEnabled
         ispProfiles[index].proxyType = proxyType
         ispProfiles[index].proxyHost = proxyHost
@@ -608,6 +692,29 @@ struct MonitorSettings: Codable, Equatable {
             seen.insert(service.id)
             return true
         }
+    }
+
+    private func mergedProbeTargets(primary: String, extras: [String]) -> [String] {
+        var seen = Set<String>()
+        let ordered = [primary] + extras
+        var results: [String] = []
+        results.reserveCapacity(ordered.count)
+
+        for raw in ordered {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                continue
+            }
+
+            let key = trimmed.lowercased()
+            guard !seen.contains(key) else {
+                continue
+            }
+            seen.insert(key)
+            results.append(trimmed)
+        }
+
+        return results
     }
 }
 
