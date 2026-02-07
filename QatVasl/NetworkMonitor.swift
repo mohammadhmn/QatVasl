@@ -133,10 +133,8 @@ final class NetworkMonitor: ObservableObject {
 
         let settings = settingsStore.settings
         let routeContext = await routeInspector.inspect()
-        async let snapshotTask = probeEngine.runSnapshot(settings: settings)
-        async let proxyConnectedTask = probeEngine.isProxyEndpointConnected(settings: settings)
-        let snapshot = await snapshotTask
-        let proxyConnected = await proxyConnectedTask
+        let snapshot = await probeEngine.runSnapshot(settings: settings)
+        let proxyConnected = await probeEngine.isProxyEndpointConnected(settings: settings)
         apply(routeContext: routeContext, snapshot: snapshot, settings: settings, proxyConnected: proxyConnected)
         let previousState = currentState
         let nextState = ConnectivityStateEvaluator.evaluate(snapshot: snapshot, routeContext: routeContext)
