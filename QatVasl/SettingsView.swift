@@ -51,6 +51,60 @@ struct SettingsView: View {
                     }
                 }
 
+                GlassCard(cornerRadius: 18, tint: .indigo.opacity(0.38)) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("ISP Profiles")
+                            .font(.headline)
+
+                        Picker(
+                            "Active profile",
+                            selection: Binding(
+                                get: { settingsStore.settings.activeProfileID },
+                                set: { settingsStore.selectISPProfile($0) }
+                            )
+                        ) {
+                            ForEach(settingsStore.settings.ispProfiles) { profile in
+                                Text(profile.name).tag(profile.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        TextField(
+                            "Profile name",
+                            text: Binding(
+                                get: { settingsStore.settings.activeProfile?.name ?? "" },
+                                set: { newName in
+                                    settingsStore.renameISPProfile(settingsStore.settings.activeProfileID, to: newName)
+                                }
+                            )
+                        )
+                        .textFieldStyle(.roundedBorder)
+
+                        HStack {
+                            Button {
+                                settingsStore.addISPProfile()
+                            } label: {
+                                Label("Add profile", systemImage: "plus")
+                            }
+                            .buttonStyle(.glass)
+
+                            Button {
+                                settingsStore.removeISPProfile(settingsStore.settings.activeProfileID)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                            .buttonStyle(.glass)
+                            .disabled(settingsStore.settings.ispProfiles.count <= 1)
+
+                            Spacer()
+
+                            Text("\(settingsStore.settings.ispProfiles.count) profiles")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 GlassCard(cornerRadius: 18, tint: .cyan.opacity(0.40)) {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Monitor")
@@ -200,6 +254,7 @@ struct SettingsView: View {
             set: { newValue in
                 var updated = settingsStore.settings
                 updated[keyPath: keyPath] = newValue
+                updated.syncActiveProfileFromCurrentValues()
                 settingsStore.settings = updated
             }
         )

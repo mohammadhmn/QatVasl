@@ -208,6 +208,74 @@ enum ProxyType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+struct ISPProfile: Codable, Equatable, Identifiable {
+    let id: String
+    var name: String
+    var intervalSeconds: Double
+    var timeoutSeconds: Double
+    var domesticURL: String
+    var globalURL: String
+    var blockedURL: String
+    var proxyEnabled: Bool
+    var proxyType: ProxyType
+    var proxyHost: String
+    var proxyPort: Int
+
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        intervalSeconds: Double,
+        timeoutSeconds: Double,
+        domesticURL: String,
+        globalURL: String,
+        blockedURL: String,
+        proxyEnabled: Bool,
+        proxyType: ProxyType,
+        proxyHost: String,
+        proxyPort: Int
+    ) {
+        self.id = id
+        self.name = name
+        self.intervalSeconds = intervalSeconds
+        self.timeoutSeconds = timeoutSeconds
+        self.domesticURL = domesticURL
+        self.globalURL = globalURL
+        self.blockedURL = blockedURL
+        self.proxyEnabled = proxyEnabled
+        self.proxyType = proxyType
+        self.proxyHost = proxyHost
+        self.proxyPort = proxyPort
+    }
+
+    static func fromCurrentSettings(_ settings: MonitorSettings, name: String, id: String = UUID().uuidString) -> ISPProfile {
+        ISPProfile(
+            id: id,
+            name: name,
+            intervalSeconds: settings.intervalSeconds,
+            timeoutSeconds: settings.timeoutSeconds,
+            domesticURL: settings.domesticURL,
+            globalURL: settings.globalURL,
+            blockedURL: settings.blockedURL,
+            proxyEnabled: settings.proxyEnabled,
+            proxyType: settings.proxyType,
+            proxyHost: settings.proxyHost,
+            proxyPort: settings.proxyPort
+        )
+    }
+
+    func apply(to settings: inout MonitorSettings) {
+        settings.intervalSeconds = intervalSeconds
+        settings.timeoutSeconds = timeoutSeconds
+        settings.domesticURL = domesticURL
+        settings.globalURL = globalURL
+        settings.blockedURL = blockedURL
+        settings.proxyEnabled = proxyEnabled
+        settings.proxyType = proxyType
+        settings.proxyHost = proxyHost
+        settings.proxyPort = proxyPort
+    }
+}
+
 struct MonitorSettings: Codable, Equatable {
     var intervalSeconds: Double
     var timeoutSeconds: Double
@@ -220,6 +288,8 @@ struct MonitorSettings: Codable, Equatable {
     var proxyPort: Int
     var notificationsEnabled: Bool
     var notifyOnRecovery: Bool
+    var ispProfiles: [ISPProfile]
+    var activeProfileID: String
     var notificationCooldownMinutes: Double
     var quietHoursEnabled: Bool
     var quietHoursStart: Int
@@ -238,6 +308,8 @@ struct MonitorSettings: Codable, Equatable {
         case proxyPort
         case notificationsEnabled
         case notifyOnRecovery
+        case ispProfiles
+        case activeProfileID
         case notificationCooldownMinutes
         case quietHoursEnabled
         case quietHoursStart
@@ -258,6 +330,8 @@ struct MonitorSettings: Codable, Equatable {
             proxyPort: 10808,
             notificationsEnabled: true,
             notifyOnRecovery: true,
+            ispProfiles: [],
+            activeProfileID: "",
             notificationCooldownMinutes: 3,
             quietHoursEnabled: false,
             quietHoursStart: 0,
@@ -278,6 +352,8 @@ struct MonitorSettings: Codable, Equatable {
         proxyPort: Int,
         notificationsEnabled: Bool,
         notifyOnRecovery: Bool,
+        ispProfiles: [ISPProfile],
+        activeProfileID: String,
         notificationCooldownMinutes: Double,
         quietHoursEnabled: Bool,
         quietHoursStart: Int,
@@ -295,11 +371,14 @@ struct MonitorSettings: Codable, Equatable {
         self.proxyPort = proxyPort
         self.notificationsEnabled = notificationsEnabled
         self.notifyOnRecovery = notifyOnRecovery
+        self.ispProfiles = ispProfiles
+        self.activeProfileID = activeProfileID
         self.notificationCooldownMinutes = notificationCooldownMinutes
         self.quietHoursEnabled = quietHoursEnabled
         self.quietHoursStart = quietHoursStart
         self.quietHoursEnd = quietHoursEnd
         self.launchAtLogin = launchAtLogin
+        sanitizeProfiles()
     }
 
     init(from decoder: Decoder) throws {
@@ -317,11 +396,15 @@ struct MonitorSettings: Codable, Equatable {
         proxyPort = try container.decodeIfPresent(Int.self, forKey: .proxyPort) ?? defaults.proxyPort
         notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? defaults.notificationsEnabled
         notifyOnRecovery = try container.decodeIfPresent(Bool.self, forKey: .notifyOnRecovery) ?? defaults.notifyOnRecovery
+        ispProfiles = try container.decodeIfPresent([ISPProfile].self, forKey: .ispProfiles) ?? []
+        activeProfileID = try container.decodeIfPresent(String.self, forKey: .activeProfileID) ?? ""
         notificationCooldownMinutes = try container.decodeIfPresent(Double.self, forKey: .notificationCooldownMinutes) ?? defaults.notificationCooldownMinutes
         quietHoursEnabled = try container.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? defaults.quietHoursEnabled
         quietHoursStart = try container.decodeIfPresent(Int.self, forKey: .quietHoursStart) ?? defaults.quietHoursStart
         quietHoursEnd = try container.decodeIfPresent(Int.self, forKey: .quietHoursEnd) ?? defaults.quietHoursEnd
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? defaults.launchAtLogin
+
+        sanitizeProfiles()
     }
 
     var normalizedInterval: TimeInterval {
@@ -369,6 +452,80 @@ struct MonitorSettings: Codable, Equatable {
             quietHoursEnabled = true
             quietHoursStart = 0
             quietHoursEnd = 7
+        }
+    }
+
+    var activeProfile: ISPProfile? {
+        ispProfiles.first(where: { $0.id == activeProfileID })
+    }
+
+    mutating func selectProfile(id: String) {
+        guard let profile = ispProfiles.first(where: { $0.id == id }) else {
+            return
+        }
+        activeProfileID = profile.id
+        profile.apply(to: &self)
+    }
+
+    mutating func syncActiveProfileFromCurrentValues() {
+        sanitizeProfiles()
+        guard let index = ispProfiles.firstIndex(where: { $0.id == activeProfileID }) else {
+            return
+        }
+
+        ispProfiles[index].intervalSeconds = intervalSeconds
+        ispProfiles[index].timeoutSeconds = timeoutSeconds
+        ispProfiles[index].domesticURL = domesticURL
+        ispProfiles[index].globalURL = globalURL
+        ispProfiles[index].blockedURL = blockedURL
+        ispProfiles[index].proxyEnabled = proxyEnabled
+        ispProfiles[index].proxyType = proxyType
+        ispProfiles[index].proxyHost = proxyHost
+        ispProfiles[index].proxyPort = proxyPort
+    }
+
+    mutating func addProfile(named name: String) {
+        let newName = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Profile \(ispProfiles.count + 1)"
+            : name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let profile = ISPProfile.fromCurrentSettings(self, name: newName)
+        ispProfiles.append(profile)
+        activeProfileID = profile.id
+    }
+
+    mutating func renameProfile(id: String, name: String) {
+        guard let index = ispProfiles.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        ispProfiles[index].name = trimmed.isEmpty ? "Profile" : trimmed
+    }
+
+    mutating func removeProfile(id: String) {
+        guard ispProfiles.count > 1 else {
+            return
+        }
+        ispProfiles.removeAll { $0.id == id }
+        sanitizeProfiles()
+    }
+
+    mutating func sanitizeProfiles() {
+        if ispProfiles.isEmpty {
+            let primary = ISPProfile.fromCurrentSettings(self, name: "Primary ISP")
+            let backup = ISPProfile.fromCurrentSettings(self, name: "Backup ISP")
+            let mobile = ISPProfile.fromCurrentSettings(self, name: "Mobile ISP")
+            ispProfiles = [primary, backup, mobile]
+            activeProfileID = primary.id
+            primary.apply(to: &self)
+            return
+        }
+
+        if activeProfileID.isEmpty || !ispProfiles.contains(where: { $0.id == activeProfileID }) {
+            if let first = ispProfiles.first {
+                activeProfileID = first.id
+                first.apply(to: &self)
+            }
         }
     }
 }

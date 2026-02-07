@@ -56,6 +56,12 @@ struct MenuBarContentView: View {
 
                 Divider()
 
+                if let activeProfile = settingsStore.settings.activeProfile {
+                    Text("ISP: \(activeProfile.name)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 Text("Proxy: \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
                     .font(.caption)
                     .foregroundStyle(.secondary)

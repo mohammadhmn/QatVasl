@@ -199,6 +199,11 @@ struct ContentView: View {
                 VStack(alignment: .trailing, spacing: 3) {
                     Text("Interval \(Int(settingsStore.settings.intervalSeconds))s")
                         .font(.caption.weight(.semibold))
+                    if let activeProfile = settingsStore.settings.activeProfile {
+                        Text("ISP \(activeProfile.name)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     Text("Proxy \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -357,6 +362,9 @@ struct ContentView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 4) {
+                    if let activeProfile = settingsStore.settings.activeProfile {
+                        Text("ISP \(activeProfile.name)")
+                    }
                     Text("Interval \(Int(settingsStore.settings.intervalSeconds))s")
                     Text("Proxy \(settingsStore.settings.proxyHost):\(settingsStore.settings.proxyPort)")
                 }

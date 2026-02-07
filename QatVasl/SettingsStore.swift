@@ -38,12 +38,42 @@ final class SettingsStore: ObservableObject {
     func resetToDefaults() {
         var reset = MonitorSettings.defaults
         reset.launchAtLogin = LoginItemManager.isEnabled
+        reset.syncActiveProfileFromCurrentValues()
         settings = reset
     }
 
     func applyPreset(_ preset: SettingsPreset) {
         var updated = settings
         updated.applyPreset(preset)
+        updated.syncActiveProfileFromCurrentValues()
+        settings = updated
+    }
+
+    func selectISPProfile(_ id: String) {
+        var updated = settings
+        updated.selectProfile(id: id)
+        updated.syncActiveProfileFromCurrentValues()
+        settings = updated
+    }
+
+    func addISPProfile(named name: String? = nil) {
+        var updated = settings
+        updated.addProfile(named: name ?? "New ISP")
+        updated.syncActiveProfileFromCurrentValues()
+        settings = updated
+    }
+
+    func removeISPProfile(_ id: String) {
+        var updated = settings
+        updated.removeProfile(id: id)
+        updated.syncActiveProfileFromCurrentValues()
+        settings = updated
+    }
+
+    func renameISPProfile(_ id: String, to name: String) {
+        var updated = settings
+        updated.renameProfile(id: id, name: name)
+        updated.syncActiveProfileFromCurrentValues()
         settings = updated
     }
 
@@ -54,18 +84,22 @@ final class SettingsStore: ObservableObject {
 
             var updated = settings
             updated.launchAtLogin = enabled
+            updated.syncActiveProfileFromCurrentValues()
             settings = updated
         } catch {
             launchAtLoginError = error.localizedDescription
 
             var updated = settings
             updated.launchAtLogin = LoginItemManager.isEnabled
+            updated.syncActiveProfileFromCurrentValues()
             settings = updated
         }
     }
 
     private func persist(_ settings: MonitorSettings) {
-        guard let data = try? JSONEncoder().encode(settings) else {
+        var synced = settings
+        synced.syncActiveProfileFromCurrentValues()
+        guard let data = try? JSONEncoder().encode(synced) else {
             return
         }
         defaults.set(data, forKey: storageKey)
