@@ -3,17 +3,13 @@ import SwiftUI
 extension ConnectivityState {
     var accentColor: Color {
         switch self {
+        case .checking:
+            return .blue
         case .offline:
             return .red
-        case .domesticOnly:
-            return .orange
-        case .globalLimited:
+        case .degraded:
             return .yellow
-        case .vpnOK:
-            return .green
-        case .vpnOrProxyActive:
-            return .blue
-        case .openInternet:
+        case .usable:
             return .mint
         }
     }

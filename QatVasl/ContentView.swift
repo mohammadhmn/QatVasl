@@ -93,9 +93,9 @@ struct ContentView: View {
             .padding(.top, 12)
             .padding(.bottom, 10)
             .safeAreaInset(edge: .bottom) {
-                GlassCard(cornerRadius: 14, tint: monitor.currentState.accentColor.opacity(0.45)) {
+                GlassCard(cornerRadius: 14, tint: monitor.displayState.accentColor.opacity(0.45)) {
                     HStack {
-                        StatusPill(state: monitor.currentState)
+                        StatusPill(state: monitor.displayState)
 
                         Spacer()
 
@@ -128,13 +128,16 @@ struct ContentView: View {
                         switch selectedSidebarItem ?? .overview {
                         case .overview:
                             statusHero
+                            diagnosisSection
                             controlsRow
                             probesSection
                         case .probes:
                             statusHero
+                            diagnosisSection
                             probesSection
                         case .timeline:
                             statusHero
+                            diagnosisSection
                             transitionsSection
                         case .settings:
                             settingsShortcutSection
@@ -213,37 +216,39 @@ struct ContentView: View {
     }
 
     private var statusHero: some View {
-        GlassCard(cornerRadius: 24, tint: monitor.currentState.accentColor.opacity(0.45)) {
+        GlassCard(cornerRadius: 24, tint: monitor.displayState.accentColor.opacity(0.45)) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     HStack(spacing: 12) {
-                        StateGlyph(state: monitor.currentState)
+                        StateGlyph(state: monitor.displayState)
 
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Live Network Status")
+                            Text("Current Status")
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
 
-                            Text(monitor.currentState.shortLabel)
+                            Text(monitor.displayState.shortLabel)
                                 .font(.title2.weight(.bold))
                         }
                     }
 
                     Spacer()
 
-                    StatusPill(state: monitor.currentState)
+                    StatusPill(state: monitor.displayState)
                 }
 
-                Text(monitor.currentState.detail)
+                Text(monitor.displayState.detail)
                     .font(.body.weight(.medium))
 
-                Text(monitor.currentState.suggestedAction)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ForEach(monitor.routeIndicators) { indicator in
+                        RouteChip(indicator: indicator)
+                    }
+                }
 
                 if !monitor.isDirectPathClean {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Direct path check paused while VPN is active.", systemImage: "info.circle")
+                        Label("Direct path means no VPN and no PROXY.", systemImage: "info.circle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -275,6 +280,56 @@ struct ContentView: View {
                         ProgressView()
                             .controlSize(.small)
                     }
+                }
+            }
+        }
+    }
+
+    private var diagnosisSection: some View {
+        GlassCard(cornerRadius: 18, tint: .blue.opacity(0.42)) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Why this state?")
+                    .font(.headline)
+
+                Text(monitor.diagnosis.title)
+                    .font(.callout.weight(.semibold))
+
+                Text(monitor.diagnosis.explanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                if !monitor.diagnosis.actions.isEmpty {
+                    Text("Fix now")
+                        .font(.subheadline.weight(.semibold))
+
+                    ForEach(Array(monitor.diagnosis.actions.enumerated()), id: \.offset) { index, action in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("\(index + 1).")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(action)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                HStack {
+                    Button {
+                        copyDiagnosisToClipboard()
+                    } label: {
+                        Label("Copy diagnosis", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.glass)
+
+                    Button {
+                        presentSettings()
+                    } label: {
+                        Label("Open settings", systemImage: "gearshape.fill")
+                    }
+                    .buttonStyle(.glass)
+
+                    Spacer()
                 }
             }
         }
@@ -418,5 +473,32 @@ struct ContentView: View {
         openSettings()
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func copyDiagnosisToClipboard() {
+        let snapshotSummary: String
+        if let snapshot = monitor.lastSnapshot {
+            snapshotSummary = snapshot.allResults
+                .map { "\($0.name): \($0.summary)" }
+                .joined(separator: "\n")
+        } else {
+            snapshotSummary = "No probe snapshot yet."
+        }
+
+        let payload = """
+        Status: \(monitor.displayState.shortLabel)
+        \(monitor.routeModeLabel)
+        Diagnosis: \(monitor.diagnosis.title)
+        \(monitor.diagnosis.explanation)
+
+        Suggested actions:
+        \(monitor.diagnosis.actions.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))
+
+        Probes:
+        \(snapshotSummary)
+        """
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(payload, forType: .string)
     }
 }

@@ -65,6 +65,34 @@ struct StateGlyph: View {
     }
 }
 
+struct RouteChip: View {
+    let indicator: RouteIndicator
+
+    var body: some View {
+        Label(indicator.kind.title, systemImage: indicator.kind.systemImage)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .glassEffect(.regular.tint(chipColor.opacity(indicator.isActive ? 0.18 : 0.06)), in: Capsule(style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(indicator.isActive ? chipColor.opacity(0.5) : .white.opacity(0.08), lineWidth: 0.9)
+            )
+            .foregroundStyle(indicator.isActive ? chipColor : .secondary)
+    }
+
+    private var chipColor: Color {
+        switch indicator.kind {
+        case .direct:
+            return .mint
+        case .vpn:
+            return .indigo
+        case .proxy:
+            return .cyan
+        }
+    }
+}
+
 struct ProbeMetricCard: View {
     let result: ProbeResult
 

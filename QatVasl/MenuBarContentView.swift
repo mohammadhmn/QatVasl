@@ -11,7 +11,7 @@ struct MenuBarContentView: View {
         GlassCard(cornerRadius: 16, tint: .indigo.opacity(0.40)) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    StatusPill(state: monitor.currentState)
+                    StatusPill(state: monitor.displayState)
                     Spacer()
                     if monitor.isChecking {
                         ProgressView()
@@ -19,10 +19,10 @@ struct MenuBarContentView: View {
                     }
                 }
 
-                Text(monitor.currentState.detail)
+                Text(monitor.displayState.detail)
                     .font(.callout.weight(.medium))
 
-                Text(monitor.currentState.suggestedAction)
+                Text(monitor.diagnosis.title)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -44,6 +44,14 @@ struct MenuBarContentView: View {
                     Text("Waiting for first probe...")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                }
+
+                Divider()
+
+                HStack(spacing: 8) {
+                    ForEach(monitor.routeIndicators) { indicator in
+                        RouteChip(indicator: indicator)
+                    }
                 }
 
                 Divider()

@@ -79,13 +79,13 @@ struct QatVaslApp: App {
         label: {
             HStack(spacing: 5) {
                 Circle()
-                    .fill(monitor.currentState.accentColor)
+                    .fill(monitor.displayState.accentColor)
                     .frame(width: 8, height: 8)
-                Text(monitor.currentState.compactMenuLabel)
+                Text(monitor.displayState.compactMenuLabel)
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
             }
-            .accessibilityLabel(monitor.currentState.menuTitle)
+            .accessibilityLabel(monitor.displayState.menuTitle)
         }
         .menuBarExtraStyle(.window)
 

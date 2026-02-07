@@ -1,78 +1,88 @@
 import Foundation
 
 enum ConnectivityState: String, Codable, CaseIterable {
+    case checking
     case offline
-    case domesticOnly
-    case globalLimited
-    case vpnOK
-    case vpnOrProxyActive
-    case openInternet
+    case degraded
+    case usable
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = Self.fromStoredRawValue(rawValue) ?? .offline
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    static func fromStoredRawValue(_ rawValue: String) -> ConnectivityState? {
+        if let state = ConnectivityState(rawValue: rawValue) {
+            return state
+        }
+
+        switch rawValue {
+        case "openInternet", "vpnOK", "vpnOrProxyActive":
+            return .usable
+        case "domesticOnly", "globalLimited":
+            return .degraded
+        case "offline":
+            return .offline
+        default:
+            return nil
+        }
+    }
 
     var shortLabel: String {
         switch self {
+        case .checking:
+            return "CHECKING"
         case .offline:
             return "OFFLINE"
-        case .domesticOnly:
-            return "IR ONLY"
-        case .globalLimited:
-            return "LIMITED"
-        case .vpnOK:
-            return "VPN OK"
-        case .vpnOrProxyActive:
-            return "VPN ACTIVE"
-        case .openInternet:
-            return "OPEN"
+        case .degraded:
+            return "DEGRADED"
+        case .usable:
+            return "USABLE"
         }
     }
 
     var detail: String {
         switch self {
+        case .checking:
+            return "Running live connectivity checks"
         case .offline:
             return "No reliable connectivity"
-        case .domesticOnly:
-            return "Domestic routes work, global internet fails"
-        case .globalLimited:
-            return "Global web works, blocked services fail"
-        case .vpnOK:
-            return "Blocked targets reachable through proxy"
-        case .vpnOrProxyActive:
-            return "Traffic routed by VPN overlay"
-        case .openInternet:
-            return "Blocked targets reachable without proxy"
+        case .degraded:
+            return "Internet is partially available"
+        case .usable:
+            return "Internet is currently usable"
         }
     }
 
     var severity: Int {
         switch self {
+        case .checking:
+            return -1
         case .offline:
             return 0
-        case .domesticOnly:
+        case .degraded:
             return 1
-        case .globalLimited:
+        case .usable:
             return 2
-        case .vpnOK:
-            return 3
-        case .vpnOrProxyActive:
-            return 3
-        case .openInternet:
-            return 4
         }
     }
 
     var systemImage: String {
         switch self {
+        case .checking:
+            return "arrow.trianglehead.2.clockwise.rotate.90"
         case .offline:
             return "wifi.slash.circle.fill"
-        case .domesticOnly:
-            return "wifi.exclamationmark.circle.fill"
-        case .globalLimited:
-            return "network"
-        case .vpnOK:
-            return "lock.shield.fill"
-        case .vpnOrProxyActive:
-            return "lock.fill"
-        case .openInternet:
-            return "globe.americas.fill"
+        case .degraded:
+            return "wifi.exclamationmark"
+        case .usable:
+            return "checkmark.seal.fill"
         }
     }
 
@@ -82,50 +92,102 @@ enum ConnectivityState: String, Codable, CaseIterable {
 
     var compactMenuLabel: String {
         switch self {
+        case .checking:
+            return "CHK"
         case .offline:
             return "OFF"
-        case .domesticOnly:
-            return "IR"
-        case .globalLimited:
-            return "LMT"
-        case .vpnOK:
-            return "VPN"
-        case .vpnOrProxyActive:
-            return "VPN"
-        case .openInternet:
-            return "OPEN"
+        case .degraded:
+            return "DEG"
+        case .usable:
+            return "OK"
         }
     }
 
     var statusEmoji: String {
         switch self {
+        case .checking:
+            return "🔵"
         case .offline:
             return "🔴"
-        case .domesticOnly:
-            return "🟠"
-        case .globalLimited:
+        case .degraded:
             return "🟡"
-        case .vpnOrProxyActive:
-            return "🟣"
-        case .vpnOK, .openInternet:
+        case .usable:
             return "🟢"
         }
     }
+}
 
-    var suggestedAction: String {
+enum RouteKind: String, CaseIterable, Identifiable {
+    case direct
+    case vpn
+    case proxy
+
+    var id: String { rawValue }
+
+    var title: String {
+        rawValue.uppercased()
+    }
+
+    var systemImage: String {
         switch self {
-        case .offline:
-            return "Switch ISP first, then refresh. If unchanged, rotate VPN config."
-        case .domesticOnly:
-            return "Domestic routes are up. Keep ISP and rotate VPN config."
-        case .globalLimited:
-            return "Global web works. VPN route likely blocked; rotate VPN profile."
-        case .vpnOK:
-            return "You are connected through VPN. Keep this config and monitor stability."
-        case .vpnOrProxyActive:
-            return "Direct-path verdict is paused. Disable VPN to test raw internet directly."
-        case .openInternet:
-            return "Direct access is currently open. VPN is optional unless needed."
+        case .direct:
+            return "network"
+        case .vpn:
+            return "shield.lefthalf.filled"
+        case .proxy:
+            return "point.3.connected.trianglepath.dotted"
+        }
+    }
+}
+
+struct RouteIndicator: Identifiable, Equatable {
+    let kind: RouteKind
+    let isActive: Bool
+
+    var id: String { kind.id }
+}
+
+struct ConnectivityDiagnosis: Equatable {
+    let title: String
+    let explanation: String
+    let actions: [String]
+
+    static let initial = ConnectivityDiagnosis(
+        title: "Initial check in progress",
+        explanation: "QatVasl is gathering the first probe results.",
+        actions: ["Wait for the first check to complete."]
+    )
+}
+
+struct ConnectivityAssessment: Equatable {
+    let state: ConnectivityState
+    let diagnosis: ConnectivityDiagnosis
+    let routeIndicators: [RouteIndicator]
+    let detailLine: String
+
+    static let initial = ConnectivityAssessment(
+        state: .checking,
+        diagnosis: .initial,
+        routeIndicators: [
+            RouteIndicator(kind: .direct, isActive: false),
+            RouteIndicator(kind: .vpn, isActive: false),
+            RouteIndicator(kind: .proxy, isActive: false),
+        ],
+        detailLine: "Route: checking..."
+    )
+}
+
+enum RouteSummaryFormatter {
+    static func format(vpnActive: Bool, proxyActive: Bool) -> String {
+        switch (vpnActive, proxyActive) {
+        case (true, true):
+            return "Route: VPN + PROXY"
+        case (true, false):
+            return "Route: VPN"
+        case (false, true):
+            return "Route: PROXY"
+        case (false, false):
+            return "Route: DIRECT"
         }
     }
 }
@@ -251,9 +313,9 @@ enum ProbeKind: String, Codable, CaseIterable, Identifiable {
         case .global:
             return "Global"
         case .restrictedDirect:
-            return "Restricted (Direct)"
+            return "Blocked Service (Direct)"
         case .restrictedViaProxy:
-            return "Restricted (Via PROXY)"
+            return "Blocked Service (Proxy)"
         }
     }
 

@@ -5,6 +5,8 @@ import UserNotifications
 @MainActor
 final class NetworkMonitor: ObservableObject {
     @Published private(set) var currentState: ConnectivityState
+    @Published private(set) var diagnosis: ConnectivityDiagnosis
+    @Published private(set) var routeIndicators: [RouteIndicator]
     @Published private(set) var lastSnapshot: ProbeSnapshot?
     @Published private(set) var lastCheckedAt: Date?
     @Published private(set) var isChecking = false
@@ -27,21 +29,19 @@ final class NetworkMonitor: ObservableObject {
     private var notificationsAllowed = false
     private var hasCompletedFirstCheck = false
 
+    var displayState: ConnectivityState {
+        if !hasCompletedFirstCheck && isChecking {
+            return .checking
+        }
+        return currentState
+    }
+
     var isDirectPathClean: Bool {
-        !vpnDetected
+        !vpnDetected && !proxyDetected
     }
 
     var routeModeLabel: String {
-        switch (vpnDetected, proxyDetected) {
-        case (true, true):
-            return "Route: VPN + PROXY"
-        case (true, false):
-            return "Route: VPN active"
-        case (false, true):
-            return "Route: PROXY active"
-        case (false, false):
-            return "Route: Direct path"
-        }
+        RouteSummaryFormatter.format(vpnActive: vpnDetected, proxyActive: proxyDetected)
     }
 
     init(
@@ -55,14 +55,9 @@ final class NetworkMonitor: ObservableObject {
         self.routeInspector = routeInspector ?? RouteInspector()
         self.probeEngine = probeEngine ?? ProbeEngine()
 
-        if
-            let rawState = defaults.string(forKey: stateKey),
-            let state = ConnectivityState(rawValue: rawState)
-        {
-            self.currentState = state
-        } else {
-            self.currentState = .offline
-        }
+        self.currentState = Self.loadInitialState(from: defaults, key: stateKey)
+        self.diagnosis = .initial
+        self.routeIndicators = ConnectivityAssessment.initial.routeIndicators
         self.transitionHistory = Self.loadHistory(from: defaults, key: historyKey)
 
         settingsObserver = settingsStore.$settings
@@ -134,12 +129,26 @@ final class NetworkMonitor: ObservableObject {
         let settings = settingsStore.settings
         let routeContext = await routeInspector.inspect()
         let snapshot = await probeEngine.runSnapshot(settings: settings)
-        let proxyConnected = await probeEngine.isProxyEndpointConnected(settings: settings)
-        apply(routeContext: routeContext, snapshot: snapshot, settings: settings, proxyConnected: proxyConnected)
+        let proxyEndpointConnected = await probeEngine.isProxyEndpointConnected(settings: settings)
+        let proxyIsWorking = apply(
+            routeContext: routeContext,
+            snapshot: snapshot,
+            settings: settings,
+            proxyEndpointConnected: proxyEndpointConnected
+        )
+
+        let assessment = ConnectivityStateEvaluator.evaluate(
+            snapshot: snapshot,
+            routeContext: routeContext,
+            proxyActive: proxyIsWorking,
+            proxyEndpointConnected: proxyEndpointConnected
+        )
         let previousState = currentState
-        let nextState = ConnectivityStateEvaluator.evaluate(snapshot: snapshot, routeContext: routeContext)
+        let nextState = assessment.state
 
         currentState = nextState
+        diagnosis = assessment.diagnosis
+        routeIndicators = assessment.routeIndicators
         defaults.set(nextState.rawValue, forKey: stateKey)
 
         lastSnapshot = snapshot
@@ -157,18 +166,19 @@ final class NetworkMonitor: ObservableObject {
         routeContext: RouteContext,
         snapshot: ProbeSnapshot,
         settings: MonitorSettings,
-        proxyConnected: Bool
-    ) {
+        proxyEndpointConnected: Bool
+    ) -> Bool {
         if vpnDetected != routeContext.vpnActive {
             vpnDetected = routeContext.vpnActive
         }
-        let proxyIsWorking = settings.proxyEnabled && proxyConnected && snapshot.blockedProxy.ok
+        let proxyIsWorking = settings.proxyEnabled && proxyEndpointConnected && snapshot.blockedProxy.ok
         if proxyDetected != proxyIsWorking {
             proxyDetected = proxyIsWorking
         }
         if vpnClientLabel != routeContext.vpnClientName {
             vpnClientLabel = routeContext.vpnClientName
         }
+        return proxyIsWorking
     }
 
     private func maybeNotifyTransition(
@@ -236,5 +246,12 @@ final class NetworkMonitor: ObservableObject {
             return []
         }
         return decoded
+    }
+
+    private static func loadInitialState(from defaults: UserDefaults, key: String) -> ConnectivityState {
+        guard let rawState = defaults.string(forKey: key) else {
+            return .checking
+        }
+        return ConnectivityState.fromStoredRawValue(rawState) ?? .checking
     }
 }
