@@ -106,22 +106,31 @@ struct MenuBarContentView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    Button("Refresh") {
+                HStack(spacing: 12) {
+                    Button {
                         monitor.refreshNow()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.glass)
                     .disabled(monitor.isChecking)
+                    .help("Refresh")
 
-                    Button("Dashboard") {
+                    Button {
                         openDashboard(section: .live)
+                    } label: {
+                        Image(systemName: monitor.displayState.systemImage)
                     }
                     .buttonStyle(.glassProminent)
+                    .help("Dashboard")
 
-                    Button("Settings") {
+                    Button {
                         openDashboard(section: .settings)
+                    } label: {
+                        Image(systemName: "gearshape.fill")
                     }
                     .buttonStyle(.glass)
+                    .help("Settings")
                 }
             }
         }

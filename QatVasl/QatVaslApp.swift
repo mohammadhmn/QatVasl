@@ -86,18 +86,14 @@ struct QatVaslApp: App {
                 .preferredColorScheme(.dark)
         }
         label: {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(monitor.displayState.accentColor)
-                    .frame(width: 8, height: 8)
+            HStack(spacing: 4) {
+                Image(systemName: monitor.displayState.systemImage)
+                    .foregroundStyle(monitor.displayState.accentColor)
                 if settingsStore.settings.iranPulseEnabled {
-                    Circle()
-                        .fill(iranPulseMonitor.snapshot.severity.accentColor)
-                        .frame(width: 6, height: 6)
+                    Image(systemName: iranPulseMonitor.snapshot.severity.systemImage)
+                        .foregroundStyle(iranPulseMonitor.snapshot.severity.accentColor)
+                        .font(.system(size: 10))
                 }
-                Text(monitor.displayState.compactMenuLabel)
-                    .font(.caption.weight(.semibold))
-                    .monospacedDigit()
             }
             .accessibilityLabel("\(monitor.displayState.menuTitle). Iran pulse \(iranPulseMonitor.snapshot.compactLabel)")
         }
