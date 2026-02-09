@@ -1054,3 +1054,104 @@ struct IranPulseSnapshot: Codable, Equatable {
         )
     }
 }
+
+enum LocalVsNationalCorrelationKind: String, Equatable {
+    case likelyLocalIssue
+    case likelyNationalDisruption
+    case mixedSignals
+    case stable
+    case inconclusive
+}
+
+struct LocalVsNationalCorrelationHint: Equatable {
+    let kind: LocalVsNationalCorrelationKind
+    let title: String
+    let explanation: String
+    let recommendedAction: String
+}
+
+enum LocalVsNationalCorrelationEvaluator {
+    private static let minimumPulseConfidence = 0.45
+
+    static func evaluate(
+        localState: ConnectivityState,
+        pulse: IranPulseSnapshot,
+        pulseEnabled: Bool
+    ) -> LocalVsNationalCorrelationHint {
+        if localState == .checking {
+            return LocalVsNationalCorrelationHint(
+                kind: .inconclusive,
+                title: "Correlation pending",
+                explanation: "Local connectivity checks are still in progress.",
+                recommendedAction: "Wait for the next check cycle."
+            )
+        }
+
+        if !pulseEnabled {
+            return LocalVsNationalCorrelationHint(
+                kind: .inconclusive,
+                title: "National signal unavailable",
+                explanation: "Iran Pulse monitoring is currently disabled, so correlation cannot be estimated.",
+                recommendedAction: "Enable Iran Pulse in Settings for local-vs-national hints."
+            )
+        }
+
+        let hasPulseData = pulse.score != nil && !pulse.providers.isEmpty
+        if !hasPulseData || pulse.confidence < minimumPulseConfidence || pulse.severity == .unknown {
+            return LocalVsNationalCorrelationHint(
+                kind: .inconclusive,
+                title: "Correlation low confidence",
+                explanation: "National pulse data is missing or low-confidence right now.",
+                recommendedAction: "Use local probes first and re-check when pulse confidence improves."
+            )
+        }
+
+        let pulseScore = pulse.score ?? 0
+        let nationalHealthy = pulse.severity == .normal && pulseScore >= 80
+        let nationalDisrupted = pulse.severity == .severe || (pulse.severity == .degraded && pulseScore < 65)
+        let localIssue = localState == .offline || localState == .vpnIssue || localState == .degraded
+
+        if localIssue && nationalDisrupted {
+            return LocalVsNationalCorrelationHint(
+                kind: .likelyNationalDisruption,
+                title: "Likely country-wide disruption",
+                explanation: "Local connectivity is degraded while Iran Pulse also reports broad disruption.",
+                recommendedAction: "Avoid local over-tuning; wait or switch route/provider only for urgent tasks."
+            )
+        }
+
+        if localIssue && nationalHealthy {
+            return LocalVsNationalCorrelationHint(
+                kind: .likelyLocalIssue,
+                title: "Likely local route issue",
+                explanation: "Your local checks fail, but Iran Pulse indicates normal country-wide conditions.",
+                recommendedAction: "Focus on ISP/VPN/proxy rotation and local network troubleshooting."
+            )
+        }
+
+        if !localIssue && nationalDisrupted {
+            return LocalVsNationalCorrelationHint(
+                kind: .mixedSignals,
+                title: "National disruption, local route still works",
+                explanation: "Country-wide conditions are degraded, but your current local route remains usable.",
+                recommendedAction: "Keep current route stable and avoid unnecessary reconnects."
+            )
+        }
+
+        if !localIssue && nationalHealthy {
+            return LocalVsNationalCorrelationHint(
+                kind: .stable,
+                title: "Local and national signals are healthy",
+                explanation: "Both local probes and Iran Pulse indicate stable connectivity.",
+                recommendedAction: "Continue normal operation and monitor for transitions."
+            )
+        }
+
+        return LocalVsNationalCorrelationHint(
+            kind: .mixedSignals,
+            title: "Mixed local/national signals",
+            explanation: "Signals are partially aligned but not strong enough for a strict local-vs-national verdict.",
+            recommendedAction: "Use service-level checks and recent transitions before changing setup."
+        )
+    }
+}

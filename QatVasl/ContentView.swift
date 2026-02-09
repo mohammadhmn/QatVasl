@@ -13,6 +13,14 @@ struct ContentView: View {
         settingsStore.settings
     }
 
+    private var localVsNationalHint: LocalVsNationalCorrelationHint {
+        LocalVsNationalCorrelationEvaluator.evaluate(
+            localState: monitor.displayState,
+            pulse: iranPulseMonitor.snapshot,
+            pulseEnabled: settings.iranPulseEnabled
+        )
+    }
+
     private var conciseRouteLabel: String {
         monitor.routeModeLabel.replacingOccurrences(of: "Route: ", with: "")
     }
@@ -116,6 +124,7 @@ struct ContentView: View {
                     case .live:
                         liveStatusSection
                         diagnosisSection
+                        localVsNationalHintSection
                         iranPulseSection
                         probesSection
                     case .pulse:
@@ -280,6 +289,33 @@ struct ContentView: View {
         }
     }
 
+    private var localVsNationalHintSection: some View {
+        let hint = localVsNationalHint
+        return GlassCard(cornerRadius: 18, tint: hint.kind.accentColor.opacity(0.15)) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    Label(hint.title, systemImage: hint.kind.systemImage)
+                        .font(.headline)
+                        .foregroundStyle(hint.kind.accentColor)
+
+                    Spacer()
+
+                    Text("Local vs National")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(hint.explanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                Text("Action: \(hint.recommendedAction)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var iranPulseSection: some View {
         let pulse = iranPulseMonitor.snapshot
         return GlassCard(cornerRadius: 18, tint: pulse.severity.accentColor.opacity(0.14)) {
@@ -417,6 +453,8 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            localVsNationalHintSection
 
             GlassCard(cornerRadius: 18, tint: .orange.opacity(0.10)) {
                 VStack(alignment: .leading, spacing: 8) {

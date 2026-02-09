@@ -27,3 +27,35 @@ extension IranPulseSeverity {
         }
     }
 }
+
+extension LocalVsNationalCorrelationKind {
+    var accentColor: Color {
+        switch self {
+        case .likelyLocalIssue:
+            return .orange
+        case .likelyNationalDisruption:
+            return .red
+        case .mixedSignals:
+            return .yellow
+        case .stable:
+            return .mint
+        case .inconclusive:
+            return .gray
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .likelyLocalIssue:
+            return "wifi.exclamationmark"
+        case .likelyNationalDisruption:
+            return "exclamationmark.octagon.fill"
+        case .mixedSignals:
+            return "arrow.triangle.branch"
+        case .stable:
+            return "checkmark.circle.fill"
+        case .inconclusive:
+            return "questionmark.circle.fill"
+        }
+    }
+}
